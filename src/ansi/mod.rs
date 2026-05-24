@@ -161,7 +161,13 @@ mod unix {
 
     const BUFFER_SIZE: usize = 1024;
 
-    static PRIOR_TERMIOS: Mutex<Option<libc::termios>> = Mutex::new(None);
+    struct RawMode {
+        termios: libc::termios,
+        fd: RawFd,
+        _tty: Option<std::fs::File>,
+    }
+
+    static PRIOR_TERMIOS: Mutex<Option<RawMode>> = Mutex::new(None);
 
     /// Whether raw mode is currently enabled.
     pub fn is_raw_mode_enabled() -> bool {
@@ -174,7 +180,7 @@ mod unix {
         if prior.is_some() {
             return Ok(());
         }
-        let fd = libc::STDIN_FILENO;
+        let (fd, tty) = open_tty()?;
         let mut termios = unsafe { std::mem::zeroed::<libc::termios>() };
         if unsafe { libc::tcgetattr(fd, &mut termios) } != 0 {
             return Err(io::Error::last_os_error());
@@ -184,15 +190,15 @@ mod unix {
         if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &termios) } != 0 {
             return Err(io::Error::last_os_error());
         }
-        *prior = Some(original);
+        *prior = Some(RawMode { termios: original, fd, _tty: tty });
         Ok(())
     }
 
     /// Restores the terminal mode saved by [`enable_raw_mode`].
     pub fn disable_raw_mode() -> io::Result<()> {
         let mut prior = PRIOR_TERMIOS.lock().unwrap();
-        if let Some(original) = prior.as_ref() {
-            let rc = unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, original) };
+        if let Some(state) = prior.as_ref() {
+            let rc = unsafe { libc::tcsetattr(state.fd, libc::TCSANOW, &state.termios) };
             if rc != 0 {
                 return Err(io::Error::last_os_error());
             }

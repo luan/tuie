@@ -1,8 +1,8 @@
 [package]
 name = "tuie"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-description = "A composable widget toolkit for terminal UIs, optionally rendered as a GUI."
+description = "A rich, performant TUI library for Rust."
 license = "MIT"
 repository = "https://github.com/jake-stewart/tuie"
 readme = "readme.md"

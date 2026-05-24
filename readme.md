@@ -94,8 +94,8 @@ You can also `impl Widget` yourself, which is how all of the default widgets are
 
 ## Examples
 
-- [`tuie-demo`](https://example.com/demo): discoverable, interactive reference covering most widgets and features.
-- [`fz`](https://example.com/fz): fuzzy finder built on tuie, a real-world example of a non-trivial application.
+- [`tuie-demo`](https://github.com/jake-stewart/tuie-demo): discoverable, interactive reference covering most widgets and features.
+- [`fz`](https://github.com/jake-stewart/fz): fuzzy finder built on tuie, a real-world example of a non-trivial application.
 
 ## Feature flags
 
