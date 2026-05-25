@@ -13,7 +13,7 @@ use crate::widget::{clear_path_cache, walk_path_mut};
 use crate::ansi::{self, output};
 use crate::ansi::query::{
     QueryBatch, QueryCellPixelSize, QueryKittyGraphicsSupport, QueryMousePixelMode,
-    QuerySixelSupport, QueryXtVersion,
+    QuerySixelSupport, QueryWindowPixelSize, QueryXtVersion,
 };
 use self::tree::*;
 use std::{
@@ -400,9 +400,10 @@ pub(crate) fn sync_gui_grid_size(cells: Vec2<u16>, cell_px: Vec2<u16>) {
             info.cell_px = Some(cell_px);
         }
     });
+    with_runtime_mut(|rt| rt.logical_cell_px = Some(cell_px));
 }
 
-fn winsize_cell_px() -> Option<Vec2<u16>> {
+fn physical_cell_px() -> Option<Vec2<u16>> {
     let mut ws: libc::winsize = unsafe { std::mem::zeroed() };
     let rc = unsafe { libc::ioctl(libc::STDIN_FILENO, libc::TIOCGWINSZ, &mut ws) };
     if rc != 0 || ws.ws_col == 0 || ws.ws_row == 0 || ws.ws_xpixel == 0 || ws.ws_ypixel == 0 {
@@ -905,28 +906,45 @@ pub(crate) fn update(
             }
             RuntimeEvent::Resize(size) => {
                 let cell_px = match with_ctx(|c| c.mode) {
-                    Mode::Tui => winsize_cell_px(),
+                    Mode::Tui => physical_cell_px(),
                     #[cfg(feature = "gui")]
                     Mode::Gui => try_with_gui_state(|s| s.font_cell_px()),
                     #[cfg(not(feature = "gui"))]
                     Mode::Gui => unreachable!(),
                 };
-                let (pixel_mode, effective_cell_px) = with_ctx_mut(|ctx| {
+                let (pixel_mode, old_physical) = with_ctx_mut(|ctx| {
                     if let Some(px) = cell_px {
                         ctx.pending_cell_px = Some(px);
                     }
                     if let Some(info) = ctx.terminal_info.as_mut() {
                         info.size = *size;
-                        if let Some(px) = cell_px {
-                            info.cell_px = Some(px);
+                        let old = info.cell_px;
+                        if let Some(new_physical) = cell_px {
+                            info.cell_px = Some(new_physical);
                         }
-                        (info.mouse_pixel_capture, info.cell_px)
+                        (info.mouse_pixel_capture, old)
                     } else {
                         (false, None)
                     }
                 });
+                let effective_logical = with_runtime_mut(|rt| {
+                    if let Some(new_physical) = cell_px {
+                        rt.logical_cell_px = match (old_physical, rt.logical_cell_px) {
+                            (Some(old_p), Some(old_l)) => Some(Vec2::new(
+                                ((old_l.x as u32 * new_physical.x as u32)
+                                    / old_p.x.max(1) as u32)
+                                    .max(1) as u16,
+                                ((old_l.y as u32 * new_physical.y as u32)
+                                    / old_p.y.max(1) as u32)
+                                    .max(1) as u16,
+                            )),
+                            _ => Some(new_physical),
+                        };
+                    }
+                    rt.logical_cell_px
+                });
                 if pixel_mode {
-                    set_mouse_pixel_cell_size(effective_cell_px);
+                    set_mouse_pixel_cell_size(effective_logical);
                 }
             }
             _ => {}
@@ -1157,6 +1175,7 @@ struct Runtime {
     has_rendered: bool,
     pending_events: Vec<RuntimeEvent>,
     popups: Vec<crate::runtime::popup::ActivePopup>,
+    logical_cell_px: Option<Vec2<u16>>,
 }
 
 fn find_visible_focusable(
@@ -1241,6 +1260,7 @@ impl Runtime {
             has_rendered: false,
             pending_events: Vec::new(),
             popups: Vec::new(),
+            logical_cell_px: None,
         }
     }
 
@@ -1347,6 +1367,7 @@ impl Runtime {
             });
             ctx.image_caps = ImageCaps::default();
         });
+        self.logical_cell_px = Some(cell_px);
         self.renderer.clear();
         self.cursor_visible = true;
         dirty_layout();
@@ -1364,17 +1385,20 @@ impl Runtime {
                 let sixel_h = batch.add(QuerySixelSupport);
                 let xtver = batch.add(QueryXtVersion);
                 let mouse_px_h = batch.add(QueryMousePixelMode);
+                let win_px_h = batch.add(QueryWindowPixelSize);
                 let cell_px_h = batch.add(QueryCellPixelSize);
                 #[cfg(feature = "harmonious")]
                 let color_handles = crate::theme::harmonious::add_color_queries(&mut batch);
 
+                let physical = physical_cell_px();
                 let mut info = TerminalInfo {
                     size: initial_size,
-                    cell_px: winsize_cell_px(),
+                    cell_px: physical,
                     mouse_pixel_capture: false,
                     color_scheme: None,
                     xtversion: None,
                 };
+                let mut logical = physical;
                 let mut caps = ImageCaps::default();
 
                 match batch.execute() {
@@ -1386,9 +1410,17 @@ impl Runtime {
                         if let Some(px) = results.get(&cell_px_h).unwrap_or(None) {
                             info.cell_px = Some(Vec2::new(px.width, px.height));
                         }
+                        if let Some(win) = results.get(&win_px_h).unwrap_or(None) {
+                            let cols = initial_size.x.max(1);
+                            let rows = initial_size.y.max(1);
+                            logical = Some(Vec2::new(
+                                (win.width / cols).max(1),
+                                (win.height / rows).max(1),
+                            ));
+                        }
                         info.mouse_pixel_capture =
                             results.get(&mouse_px_h).unwrap_or(None).unwrap_or(false)
-                                && info.cell_px.is_some();
+                                && logical.is_some();
                         if let Some(ver) = results.get(&xtver).unwrap_or(None) {
                             if ver.starts_with("WezTerm ") {
                                 caps.supports_kitty_graphics = false;
@@ -1410,6 +1442,7 @@ impl Runtime {
                 #[cfg(all(unix, feature = "images"))]
                 crate::render::image::shm::unlink_probe();
 
+                self.logical_cell_px = logical;
                 with_ctx_mut(|ctx| {
                     ctx.pending_cell_px = info.cell_px;
                     ctx.terminal_info = Some(info);
@@ -1439,15 +1472,15 @@ impl Runtime {
             output::enable_mouse_hover_events(&mut self.buf);
         }
         output::enable_sgr_mouse(&mut self.buf);
-        let (pixel_mouse, cell_px) = with_ctx(|ctx| {
+        let pixel_mouse = with_ctx(|ctx| {
             ctx.terminal_info
                 .as_ref()
-                .map(|i| (i.mouse_pixel_capture, i.cell_px))
-                .unwrap_or((false, None))
+                .map(|i| i.mouse_pixel_capture)
+                .unwrap_or(false)
         });
         if pixel_mouse {
             output::enable_mouse_pixel_capture(&mut self.buf);
-            set_mouse_pixel_cell_size(cell_px);
+            set_mouse_pixel_cell_size(self.logical_cell_px);
         } else {
             set_mouse_pixel_cell_size(None);
         }
