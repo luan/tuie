@@ -22,7 +22,7 @@ use std::{
     io::Write,
     pin::Pin,
     rc::Rc,
-    sync::{Arc, Mutex, atomic::{AtomicI16, AtomicU32, Ordering}, mpsc as sync_mpsc},
+    sync::{Arc, Mutex, atomic::{AtomicI16, AtomicU16, Ordering}, mpsc as sync_mpsc},
     time::Duration,
 };
 
@@ -291,22 +291,22 @@ thread_local! {
 static EVENT_LOOP_PROXY: std::sync::OnceLock<winit::event_loop::EventLoopProxy<()>> =
     std::sync::OnceLock::new();
 
-static MOUSE_PIXEL_CELL: AtomicU32 = AtomicU32::new(0);
+static MOUSE_PIXEL_DPR: AtomicU16 = AtomicU16::new(0);
 
-pub(crate) fn mouse_pixel_cell_size() -> Option<(u16, u16)> {
-    let v = MOUSE_PIXEL_CELL.load(Ordering::Relaxed);
+pub(crate) fn mouse_pixel_dpr() -> Option<Vec2<u8>> {
+    let v = MOUSE_PIXEL_DPR.load(Ordering::Relaxed);
     if v == 0 {
         None
     } else {
-        Some(((v >> 16) as u16, v as u16))
+        Some(Vec2::new((v >> 8) as u8, v as u8))
     }
 }
 
-fn set_mouse_pixel_cell_size(cell_px: Option<Vec2<u16>>) {
-    let packed = cell_px
-        .map(|p| (u32::from(p.x.max(1)) << 16) | u32::from(p.y.max(1)))
+fn set_mouse_pixel_dpr(dpr: Option<Vec2<u8>>) {
+    let packed = dpr
+        .map(|d| (u16::from(d.x.max(1)) << 8) | u16::from(d.y.max(1)))
         .unwrap_or(0);
-    MOUSE_PIXEL_CELL.store(packed, Ordering::Relaxed);
+    MOUSE_PIXEL_DPR.store(packed, Ordering::Relaxed);
 }
 
 static INBOX: Mutex<Vec<(WidgetId, Box<dyn std::any::Any + Send>)>> =
@@ -400,7 +400,6 @@ pub(crate) fn sync_gui_grid_size(cells: Vec2<u16>, cell_px: Vec2<u16>) {
             info.cell_px = Some(cell_px);
         }
     });
-    with_runtime_mut(|rt| rt.logical_cell_px = Some(cell_px));
 }
 
 fn physical_cell_px() -> Option<Vec2<u16>> {
@@ -912,40 +911,17 @@ pub(crate) fn update(
                     #[cfg(not(feature = "gui"))]
                     Mode::Gui => unreachable!(),
                 };
-                let (pixel_mode, old_physical) = with_ctx_mut(|ctx| {
+                with_ctx_mut(|ctx| {
                     if let Some(px) = cell_px {
                         ctx.pending_cell_px = Some(px);
                     }
                     if let Some(info) = ctx.terminal_info.as_mut() {
                         info.size = *size;
-                        let old = info.cell_px;
                         if let Some(new_physical) = cell_px {
                             info.cell_px = Some(new_physical);
                         }
-                        (info.mouse_pixel_capture, old)
-                    } else {
-                        (false, None)
                     }
                 });
-                let effective_logical = with_runtime_mut(|rt| {
-                    if let Some(new_physical) = cell_px {
-                        rt.logical_cell_px = match (old_physical, rt.logical_cell_px) {
-                            (Some(old_p), Some(old_l)) => Some(Vec2::new(
-                                ((old_l.x as u32 * new_physical.x as u32)
-                                    / old_p.x.max(1) as u32)
-                                    .max(1) as u16,
-                                ((old_l.y as u32 * new_physical.y as u32)
-                                    / old_p.y.max(1) as u32)
-                                    .max(1) as u16,
-                            )),
-                            _ => Some(new_physical),
-                        };
-                    }
-                    rt.logical_cell_px
-                });
-                if pixel_mode {
-                    set_mouse_pixel_cell_size(effective_logical);
-                }
             }
             _ => {}
         }
@@ -1175,7 +1151,7 @@ struct Runtime {
     has_rendered: bool,
     pending_events: Vec<RuntimeEvent>,
     popups: Vec<crate::runtime::popup::ActivePopup>,
-    logical_cell_px: Option<Vec2<u16>>,
+    mouse_pixel_dpr: Option<Vec2<u8>>,
 }
 
 fn find_visible_focusable(
@@ -1260,7 +1236,7 @@ impl Runtime {
             has_rendered: false,
             pending_events: Vec::new(),
             popups: Vec::new(),
-            logical_cell_px: None,
+            mouse_pixel_dpr: None,
         }
     }
 
@@ -1367,7 +1343,6 @@ impl Runtime {
             });
             ctx.image_caps = ImageCaps::default();
         });
-        self.logical_cell_px = Some(cell_px);
         self.renderer.clear();
         self.cursor_visible = true;
         dirty_layout();
@@ -1398,7 +1373,6 @@ impl Runtime {
                     color_scheme: None,
                     xtversion: None,
                 };
-                let mut logical = physical;
                 let mut caps = ImageCaps::default();
 
                 match batch.execute() {
@@ -1410,17 +1384,28 @@ impl Runtime {
                         if let Some(px) = results.get(&cell_px_h).unwrap_or(None) {
                             info.cell_px = Some(Vec2::new(px.width, px.height));
                         }
-                        if let Some(win) = results.get(&win_px_h).unwrap_or(None) {
-                            let cols = initial_size.x.max(1);
-                            let rows = initial_size.y.max(1);
-                            logical = Some(Vec2::new(
-                                (win.width / cols).max(1),
-                                (win.height / rows).max(1),
+                        if let (Some(win), Some(cell)) = (
+                            results.get(&win_px_h).unwrap_or(None),
+                            info.cell_px,
+                        ) {
+                            let round_div = |num: u32, den: u32| {
+                                let den = den.max(1);
+                                ((num + den / 2) / den).clamp(1, 4) as u8
+                            };
+                            self.mouse_pixel_dpr = Some(Vec2::new(
+                                round_div(
+                                    cell.x as u32 * initial_size.x as u32,
+                                    win.width as u32,
+                                ),
+                                round_div(
+                                    cell.y as u32 * initial_size.y as u32,
+                                    win.height as u32,
+                                ),
                             ));
                         }
                         info.mouse_pixel_capture =
                             results.get(&mouse_px_h).unwrap_or(None).unwrap_or(false)
-                                && logical.is_some();
+                                && self.mouse_pixel_dpr.is_some();
                         if let Some(ver) = results.get(&xtver).unwrap_or(None) {
                             if ver.starts_with("WezTerm ") {
                                 caps.supports_kitty_graphics = false;
@@ -1442,7 +1427,6 @@ impl Runtime {
                 #[cfg(all(unix, feature = "images"))]
                 crate::render::image::shm::unlink_probe();
 
-                self.logical_cell_px = logical;
                 with_ctx_mut(|ctx| {
                     ctx.pending_cell_px = info.cell_px;
                     ctx.terminal_info = Some(info);
@@ -1480,9 +1464,9 @@ impl Runtime {
         });
         if pixel_mouse {
             output::enable_mouse_pixel_capture(&mut self.buf);
-            set_mouse_pixel_cell_size(self.logical_cell_px);
+            set_mouse_pixel_dpr(self.mouse_pixel_dpr);
         } else {
-            set_mouse_pixel_cell_size(None);
+            set_mouse_pixel_dpr(None);
         }
         output::enable_focus_change(&mut self.buf);
         output::enable_bracketed_paste(&mut self.buf);
@@ -1537,7 +1521,7 @@ impl Runtime {
         if pixel_mouse {
             output::disable_mouse_pixel_capture(&mut self.buf);
         }
-        set_mouse_pixel_cell_size(None);
+        set_mouse_pixel_dpr(None);
         output::disable_mouse_capture(&mut self.buf);
         output::disable_focus_change(&mut self.buf);
         output::disable_bracketed_paste(&mut self.buf);
@@ -1628,7 +1612,7 @@ impl Runtime {
         mouse_subpx: Vec2<i32>,
         release: bool,
     ) {
-        let cell_px = crate::runtime::tree::font_cell_px_i32();
+        let cell_px = crate::runtime::tree::cell_px();
         let pos_f = crate::runtime::tree::pos_with_subpx(mouse_pos, mouse_subpx, cell_px);
         let mut new_path: Vec<WidgetId> = vec![];
         let new_id = match self.popup_hit_test(mouse_pos) {
@@ -2105,7 +2089,7 @@ impl Runtime {
                     Some(i) => &*self.popups[i].content,
                     None => root as &dyn Widget,
                 };
-                let cell_px = crate::runtime::tree::font_cell_px_i32();
+                let cell_px = crate::runtime::tree::cell_px();
                 let pos_f = crate::runtime::tree::pos_with_subpx(
                     event.mouse_pos, event.mouse_window_subpx, cell_px,
                 );
@@ -2251,7 +2235,7 @@ impl Runtime {
         }
 
         self.scroll_pos = event.mouse_pos;
-        let cell_px = crate::runtime::tree::font_cell_px_i32();
+        let cell_px = crate::runtime::tree::cell_px();
         let pos_f = crate::runtime::tree::pos_with_subpx(
             event.mouse_pos, event.mouse_window_subpx, cell_px,
         );
@@ -2724,7 +2708,7 @@ impl Runtime {
         }
         match self.popup_hit_test(event.mouse_pos) {
             PopupHitResult::Hit(i) => {
-                let cell_px = crate::runtime::tree::font_cell_px_i32();
+                let cell_px = crate::runtime::tree::cell_px();
                 let pos_f = crate::runtime::tree::pos_with_subpx(
                     event.mouse_pos, event.mouse_window_subpx, cell_px,
                 );

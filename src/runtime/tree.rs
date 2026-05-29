@@ -29,7 +29,7 @@ pub(crate) fn rect_center(r: Rect<i32, u16>) -> Vec2<i32> {
     Axis2D::map(|a| r.pos[a] + r.size[a] as i32 / 2)
 }
 
-pub(crate) fn font_cell_px_i32() -> Vec2<i32> {
+pub(crate) fn cell_px() -> Vec2<i32> {
     if let Some(info) = crate::runtime::get_terminal_info() {
         if let Some(px) = info.cell_px {
             return Vec2::new(px.x as i32, px.y as i32);
@@ -59,7 +59,7 @@ pub(crate) fn hit_test_z(
     shifts: &mut Vec<Vec2<i32>>,
     excluded: &[WidgetId],
 ) -> Option<(WidgetId, Layer)> {
-    let cell_px = font_cell_px_i32();
+    let cell_px = cell_px();
     hit_test_z_inner(widget, pos, cell_px, Vec2::of(0i32), path, shifts, excluded)
 }
 
@@ -166,7 +166,7 @@ pub(crate) fn window_to_leaf(
     window_pos: Vec2<i32>,
     window_subpx: Vec2<i32>,
 ) -> (Vec2<i32>, Vec2<i32>) {
-    let cell_px = font_cell_px_i32();
+    let cell_px = cell_px();
     let mut pos = pos_with_subpx(window_pos, window_subpx, cell_px);
     let mut current: &dyn Widget = root;
     for &next_id in &path[1..] {

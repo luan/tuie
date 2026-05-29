@@ -157,13 +157,14 @@ impl RuntimeEventReader {
         row: u16,
         modifiers: Modifiers,
     ) -> RuntimeEvent {
-        if let Some((cw, ch)) = crate::runtime::mouse_pixel_cell_size() {
-            let cw = cw.max(1) as i32;
-            let ch = ch.max(1) as i32;
-            let px_x = column as i32;
-            let px_y = row as i32;
-            self.mouse_pos = Vec2::new(px_x / cw, px_y / ch);
-            self.mouse_subpx = Vec2::new(px_x % cw, px_y % ch);
+        if let Some(dpr) = crate::runtime::mouse_pixel_dpr() {
+            let canon = crate::runtime::tree::cell_px();
+            let phys = Vec2::new(
+                column as i32 * dpr.x as i32,
+                row as i32 * dpr.y as i32,
+            );
+            self.mouse_pos = Vec2::new(phys.x / canon.x.max(1), phys.y / canon.y.max(1));
+            self.mouse_subpx = Vec2::new(phys.x % canon.x.max(1), phys.y % canon.y.max(1));
         } else {
             self.mouse_pos = Vec2::new(column.into(), row.into());
             self.mouse_subpx = Vec2::of(-1);

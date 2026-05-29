@@ -1489,7 +1489,7 @@ impl Widget for Pane {
             return None;
         }
 
-        let cell_px = crate::runtime::tree::font_cell_px_i32();
+        let cell_px = crate::runtime::tree::cell_px();
         let pos = crate::runtime::tree::apply_subcell_offset(self, pos, cell_px);
 
         for child in self.children.iter() {
@@ -1533,7 +1533,7 @@ impl Widget for Pane {
             return None;
         }
 
-        let cell_px = crate::runtime::tree::font_cell_px_i32();
+        let cell_px = crate::runtime::tree::cell_px();
         let pos = crate::runtime::tree::apply_subcell_offset(self, pos, cell_px);
 
         for child in self.children.iter() {

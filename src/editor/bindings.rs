@@ -1,14 +1,16 @@
 //! Editor input bindings trait and shared edit-op coalescing helpers.
 
 use crate::prelude::*;
-use crate::runtime::tree::font_cell_px_i32;
 use chord_macro::chord;
 use std::any::Any;
 
 pub(crate) fn ibeam_click_pos(event: &InputEvent) -> Vec2<i32> {
     let mut pos = event.mouse_pos;
     if event.mouse_window_subpx.x >= 0 {
-        let cell_w = font_cell_px_i32().x;
+        let cell_w = crate::get_terminal_info()
+            .and_then(|i| i.cell_px)
+            .map(|c| c.x as i32)
+            .unwrap_or(1);
         if event.mouse_window_subpx.x >= cell_w / 2 {
             pos.x += 1;
         }
