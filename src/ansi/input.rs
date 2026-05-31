@@ -542,7 +542,7 @@ impl Parser {
             };
             if let Some((r, g, b)) = parse_rgb_spec(rgb_str) {
                 self.out.push_back(ParsedEvent::Color(ColorEntry {
-                    color_type: ColorType::Palette(index),
+                    color_type: ColorType::Indexed(index),
                     r,
                     g,
                     b,

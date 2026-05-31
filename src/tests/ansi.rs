@@ -387,7 +387,7 @@ fn osc_color_reply() {
     assert_eq!(
         parse_one(b"\x1B]4;1;rgb:ffff/0000/0000\x07"),
         ParsedEvent::Color(ColorEntry {
-            color_type: ColorType::Palette(1),
+            color_type: ColorType::Indexed(1),
             r: 0xff,
             g: 0x00,
             b: 0x00,

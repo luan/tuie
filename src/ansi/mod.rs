@@ -30,7 +30,7 @@ impl std::fmt::Display for ColorScheme {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum ColorType {
     /// 256-color palette entry `n` (OSC 4).
-    Palette(u8),
+    Indexed(u8),
     /// Default foreground (OSC 10).
     Foreground,
     /// Default background (OSC 11).
@@ -74,7 +74,7 @@ impl ColorType {
     /// Returns the OSC number for this color slot.
     pub fn get_osc_number(&self) -> u8 {
         match self {
-            Self::Palette(_) => 4,
+            Self::Indexed(_) => 4,
             Self::Foreground => 10,
             Self::Background => 11,
             Self::Cursor => 12,

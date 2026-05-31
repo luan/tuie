@@ -151,11 +151,11 @@ thread_local! {
 }
 
 fn color_query_types() -> Vec<ColorType> {
-    let mut types: Vec<ColorType> = (0..16u8).map(ColorType::Palette).collect();
+    let mut types: Vec<ColorType> = (0..16u8).map(ColorType::Indexed).collect();
     types.push(ColorType::Foreground);
     types.push(ColorType::Background);
-    types.push(ColorType::Palette(16));
-    types.push(ColorType::Palette(231));
+    types.push(ColorType::Indexed(16));
+    types.push(ColorType::Indexed(231));
     types
 }
 
@@ -237,7 +237,7 @@ pub fn resolve_rgb(color: Color) -> Option<Rgb> {
             Color::Rgb(r, g, b) => Some(Rgb::new(r, g, b)),
             Color::Foreground => Some(palette.fg),
             Color::Background => Some(palette.bg),
-            Color::Base256(n) => Some(palette.colors[n as usize]),
+            Color::Indexed(n) => Some(palette.colors[n as usize]),
         }
     })
 }
@@ -245,7 +245,7 @@ pub fn resolve_rgb(color: Color) -> Option<Rgb> {
 /// Maps a [`Color`] for terminal output according to the active [`PaletteKind`].
 pub fn resolve_color(color: Color) -> Color {
     match color {
-        Color::Base256(n) if n >= 16 => {
+        Color::Indexed(n) if n >= 16 => {
             COLOR_TABLE.with(|cell| {
                 let cell = cell.borrow();
                 let Some(palette) = cell.as_ref() else {
@@ -253,7 +253,7 @@ pub fn resolve_color(color: Color) -> Color {
                 };
                 match palette.kind {
                     PaletteKind::Semantic => color,
-                    PaletteKind::Inverted => Color::Base256(invert_index(n)),
+                    PaletteKind::Inverted => Color::Indexed(invert_index(n)),
                     PaletteKind::Legacy => {
                         let rgb = palette.colors[n as usize];
                         Color::Rgb(rgb.r, rgb.g, rgb.b)

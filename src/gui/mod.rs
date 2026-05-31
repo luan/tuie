@@ -419,7 +419,7 @@ fn resolve_color(color: Color) -> u32 {
         Color::Foreground => 0xFFD0D0D0,
         Color::Background => 0xFF101010,
         Color::Rgb(r, g, b) => pack_rgb(r, g, b),
-        Color::Base256(n) => fallback_ansi(n),
+        Color::Indexed(n) => fallback_ansi(n),
     }
 }
 

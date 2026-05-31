@@ -1042,8 +1042,8 @@ fn cell_padding_default_with_per_cell_override() {
 
 #[test]
 fn row_style_bordered_paints_gaps_and_external_v_borders() {
-    let r_bg = Color::Base256(2);
-    let c_bg = Color::Base256(4);
+    let r_bg = Color::Indexed(2);
+    let c_bg = Color::Indexed(4);
     let mut root = Grid::new()
         .columns([Track::fixed(2), Track::fixed(2)])
         .rows([Track::fixed(1), Track::fixed(1)])
@@ -1076,9 +1076,9 @@ fn row_style_bordered_paints_gaps_and_external_v_borders() {
 
 #[test]
 fn cell_style_overrides_combined_row_col_fill() {
-    let r_bg = Color::Base256(2);
-    let c_bg = Color::Base256(4);
-    let cell_bg = Color::Base256(5);
+    let r_bg = Color::Indexed(2);
+    let c_bg = Color::Indexed(4);
+    let cell_bg = Color::Indexed(5);
     let mut root = Grid::new()
         .columns([Track::fixed(2), Track::fixed(2)])
         .rows([Track::fixed(1), Track::fixed(1)])
@@ -1102,8 +1102,8 @@ fn cell_style_overrides_combined_row_col_fill() {
 
 #[test]
 fn per_track_border_style_colors_inner_glyphs() {
-    let r_fg = Color::Base256(1);
-    let c_fg = Color::Base256(3);
+    let r_fg = Color::Indexed(1);
+    let c_fg = Color::Indexed(3);
     let mut root = Grid::new()
         .columns([Track::fixed(1), Track::fixed(1)])
         .rows([Track::fixed(1), Track::fixed(1)])

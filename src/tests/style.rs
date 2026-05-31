@@ -104,16 +104,16 @@ fn ansi_attribute_codes_set_and_clear() {
 
 #[test]
 fn ansi_16_color_fg_bg_including_bright() {
-    assert_eq!(parse_one("\x1b[31mx").fg, Some(Color::Base256(1)));
-    assert_eq!(parse_one("\x1b[47mx").bg, Some(Color::Base256(7)));
-    assert_eq!(parse_one("\x1b[90mx").fg, Some(Color::Base256(8)));
-    assert_eq!(parse_one("\x1b[107mx").bg, Some(Color::Base256(15)));
+    assert_eq!(parse_one("\x1b[31mx").fg, Some(Color::Indexed(1)));
+    assert_eq!(parse_one("\x1b[47mx").bg, Some(Color::Indexed(7)));
+    assert_eq!(parse_one("\x1b[90mx").fg, Some(Color::Indexed(8)));
+    assert_eq!(parse_one("\x1b[107mx").bg, Some(Color::Indexed(15)));
 }
 
 #[test]
 fn ansi_extended_color_formats() {
-    assert_eq!(parse_one("\x1b[38;5;200mx").fg, Some(Color::Base256(200)));
-    assert_eq!(parse_one("\x1b[48;5;42mx").bg, Some(Color::Base256(42)));
+    assert_eq!(parse_one("\x1b[38;5;200mx").fg, Some(Color::Indexed(200)));
+    assert_eq!(parse_one("\x1b[48;5;42mx").bg, Some(Color::Indexed(42)));
     assert_eq!(parse_one("\x1b[38;2;10;20;30mx").fg, Some(Color::Rgb(10, 20, 30)));
     assert_eq!(parse_one("\x1b[48;2;255;128;0mx").bg, Some(Color::Rgb(255, 128, 0)));
 }

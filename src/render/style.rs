@@ -1046,20 +1046,20 @@ impl AnsiStyleParser {
                         29 => self.style.set_strikethrough(false),
                         30..=37 => {
                             self.style.fg =
-                                Some(Color::Base256((params[p] - 30) as u8))
+                                Some(Color::Indexed((params[p] - 30) as u8))
                         }
                         39 => self.style.fg = None,
                         40..=47 => {
                             self.style.bg =
-                                Some(Color::Base256((params[p] - 40) as u8))
+                                Some(Color::Indexed((params[p] - 40) as u8))
                         }
                         49 => self.style.bg = None,
                         90..=97 => {
                             self.style.fg =
-                                Some(Color::Base256((params[p] - 90 + 8) as u8))
+                                Some(Color::Indexed((params[p] - 90 + 8) as u8))
                         }
                         100..=107 => {
-                            self.style.bg = Some(Color::Base256(
+                            self.style.bg = Some(Color::Indexed(
                                 (params[p] - 100 + 8) as u8,
                             ))
                         }
@@ -1069,7 +1069,7 @@ impl AnsiStyleParser {
                                     5 => {
                                         if p + 2 < params.len() {
                                             self.style.fg =
-                                                Some(Color::Base256(
+                                                Some(Color::Indexed(
                                                     params[p + 2] as u8,
                                                 ));
                                             p += 2;
@@ -1095,7 +1095,7 @@ impl AnsiStyleParser {
                                     5 => {
                                         if p + 2 < params.len() {
                                             self.style.bg =
-                                                Some(Color::Base256(
+                                                Some(Color::Indexed(
                                                     params[p + 2] as u8,
                                                 ));
                                             p += 2;

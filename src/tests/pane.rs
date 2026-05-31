@@ -423,24 +423,24 @@ fn style_at_text(snap: &StyledString, text: &str) -> Style {
 #[test]
 fn child_inherits_reverse_as_concrete_swapped_colors() {
     let mut root = Pane::new()
-        .style(Style::new().fg(Color::Base256(4)).reverse())
+        .style(Style::new().fg(Color::Indexed(4)).reverse())
         .children([Text::new().content("Hi")]);
     let term = Emulator::new(&mut *root, Vec2::new(4, 1));
     let snap = term.get_snapshot();
     let style = style_at_text(&snap, "Hi");
     assert_eq!(style.fg, Some(Color::Background));
-    assert_eq!(style.bg, Some(Color::Base256(4)));
+    assert_eq!(style.bg, Some(Color::Indexed(4)));
     assert!(!style.has_reverse());
 }
 
 #[test]
 fn child_keeps_its_own_reverse() {
     let mut root = Pane::new().children([
-        Text::new().content("Hi".reverse().fg(Color::Base256(4))),
+        Text::new().content("Hi".reverse().fg(Color::Indexed(4))),
     ]);
     let term = Emulator::new(&mut *root, Vec2::new(4, 1));
     let snap = term.get_snapshot();
     let style = style_at_text(&snap, "Hi");
     assert!(style.has_reverse());
-    assert_eq!(style.fg, Some(Color::Base256(4)));
+    assert_eq!(style.fg, Some(Color::Indexed(4)));
 }
