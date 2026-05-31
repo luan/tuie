@@ -244,7 +244,7 @@ fn align_items_x_middle_centers_each_child_in_cell() {
     let mut root = Grid::new()
         .columns([Track::fixed(6)])
         .rows([Track::grow(1)])
-        .x_place(Place::Middle)
+        .x_place(Place::Center)
         .child(0, 0, cell_text("ab"));
     let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
@@ -270,7 +270,7 @@ fn align_items_y_middle_centers_child_vertically() {
     let mut root = Grid::new()
         .columns([Track::grow(1)])
         .rows([Track::fixed(3)])
-        .y_place(Place::Middle)
+        .y_place(Place::Center)
         .child(0, 0, cell_text("z"));
     let term = Emulator::new(&mut *root, Vec2::new(2, 3));
     term.assert_lines([

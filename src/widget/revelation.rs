@@ -67,7 +67,7 @@ pub fn resolve_revelation_axis(
     let end = start + size;
     match align {
         Some(Align::Start) => start - scrolloff as i32,
-        Some(Align::Middle) => start + size / 2 - viewport / 2,
+        Some(Align::Center) => start + size / 2 - viewport / 2,
         Some(Align::End) => end - viewport + scrolloff as i32,
         None => {
             let max_so = (viewport - size).max(0) / 2;

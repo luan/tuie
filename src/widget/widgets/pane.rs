@@ -864,7 +864,7 @@ impl Pane {
                         }
                     }
                     _ => match main_mode {
-                        FlexAlign::Middle if ii == 0 => slack_main / 2,
+                        FlexAlign::Center if ii == 0 => slack_main / 2,
                         FlexAlign::End if ii == 0 => slack_main,
                         _ => 0,
                     },
@@ -880,7 +880,7 @@ impl Pane {
                     - self.children[i].get_outer_size()[cross_axis] as i32;
                 let cross_fit_offset = match child_mode {
                     FlexAlign::Start | FlexAlign::Stretch => 0,
-                    FlexAlign::Middle => slack_cross / 2,
+                    FlexAlign::Center => slack_cross / 2,
                     FlexAlign::End => slack_cross,
                 };
                 let mut pos = Vec2::of(0i32);
@@ -1069,7 +1069,7 @@ impl Widget for Pane {
                     }
                 }
                 _ => match main_mode {
-                    FlexAlign::Middle if i == 0 => slack_main / 2,
+                    FlexAlign::Center if i == 0 => slack_main / 2,
                     FlexAlign::End if i == 0 => slack_main,
                     _ => 0,
                 },
@@ -1081,7 +1081,7 @@ impl Widget for Pane {
             let slack = (cross_size - child_size[cross] as i32).max(0);
             match child_mode {
                 FlexAlign::Start | FlexAlign::Stretch => {}
-                FlexAlign::Middle => pos[cross] += slack / 2,
+                FlexAlign::Center => pos[cross] += slack / 2,
                 FlexAlign::End => pos[cross] += slack,
             }
             let margin_before = child.get_layout().get_margin_before().map(|v| v as i32);

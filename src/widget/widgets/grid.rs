@@ -704,7 +704,7 @@ impl Grid {
                         slack * iu / (n as u32 - 1) - slack * (iu - 1) / (n as u32 - 1)
                     }
                 }
-                Place::Middle if i == 0 => slack / 2,
+                Place::Center if i == 0 => slack / 2,
                 Place::End if i == 0 => slack,
                 _ => 0,
             };
@@ -1220,12 +1220,12 @@ impl Widget for Grid {
             let intra = Vec2::new(
                 match mode_x {
                     FlexAlign::Stretch | FlexAlign::Start => 0,
-                    FlexAlign::Middle => slack.x / 2,
+                    FlexAlign::Center => slack.x / 2,
                     FlexAlign::End => slack.x,
                 },
                 match mode_y {
                     FlexAlign::Stretch | FlexAlign::Start => 0,
-                    FlexAlign::Middle => slack.y / 2,
+                    FlexAlign::Center => slack.y / 2,
                     FlexAlign::End => slack.y,
                 },
             );

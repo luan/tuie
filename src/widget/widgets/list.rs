@@ -354,7 +354,7 @@ impl List {
         let resolved_mode = widget.get_layout().align.get_mode(cross).unwrap_or_else(|| {
             self_align.get_place(cross).try_into().unwrap_or(FlexAlign::Start)
         });
-        if matches!(resolved_mode, FlexAlign::Start | FlexAlign::Middle | FlexAlign::End) {
+        if matches!(resolved_mode, FlexAlign::Start | FlexAlign::Center | FlexAlign::End) {
             let min_cross = widget.get_layout().constraints.min_size[cross];
             let max_cross = widget.get_layout().constraints.max_size[cross];
             let target = if max_cross < u16::MAX {
@@ -419,7 +419,7 @@ impl List {
             let child_mode = self.items[i].widget.get_layout().align.get_mode(cross).unwrap_or(cross_mode);
             match child_mode {
                 FlexAlign::Start | FlexAlign::Stretch => {}
-                FlexAlign::Middle => child_pos[cross] += slack / 2,
+                FlexAlign::Center => child_pos[cross] += slack / 2,
                 FlexAlign::End => child_pos[cross] += slack,
             }
             let margin_before = self.items[i].widget.get_layout().get_margin_before().map(|v| v as i32);
@@ -561,7 +561,7 @@ impl List {
                     Some(Align::Start) => {
                         self.anchor = Anchor { index, offset: 0 };
                     }
-                    Some(Align::Middle) => {
+                    Some(Align::Center) => {
                         self.anchor = Anchor {
                             index,
                             offset: viewport / 2,

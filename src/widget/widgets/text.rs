@@ -589,9 +589,9 @@ impl Text {
         self.align(Align::Start)
     }
 
-    /// Builder shortcut for `.align(Align::Middle)`.
+    /// Builder shortcut for `.align(Align::Center)`.
     pub fn center(self: Box<Self>) -> Box<Self> {
-        self.align(Align::Middle)
+        self.align(Align::Center)
     }
 
     /// Builder shortcut for `.align(Align::End)`.

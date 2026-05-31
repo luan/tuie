@@ -106,7 +106,7 @@ fn horizontal_gap_inserts_space_between_children() {
 fn align_middle_centers_children_on_main_axis() {
     let mut root = Pane::new()
         .horizontal()
-        .x_place(Place::Middle)
+        .x_place(Place::Center)
         .children([Text::new().content("ab")]);
     let term = Emulator::new(&mut *root, Vec2::new(6, 1));
     term.assert_lines([
@@ -130,7 +130,7 @@ fn align_end_pushes_children_to_end_of_main_axis() {
 fn fit_items_middle_centers_child_on_cross_axis() {
     let mut root = Pane::new()
         .vertical()
-        .x_place(Place::Middle)
+        .x_place(Place::Center)
         .children([Text::new().content("z")]);
     let term = Emulator::new(&mut *root, Vec2::new(5, 2));
     term.assert_lines([
@@ -314,7 +314,7 @@ fn resize_wider_collapses_rows() {
 fn wrap_align_middle_centers_each_row() {
     let mut w = wrap()
         .y_place(Place::Start)
-        .x_place(Place::Middle)
+        .x_place(Place::Center)
         .child(chip("AA"))
         .child(chip("BB"))
         .child(chip("CC"));

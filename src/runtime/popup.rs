@@ -34,8 +34,8 @@ impl Placement {
     /// Centers the popup on the anchor.
     pub fn center() -> Self {
         Self {
-            anchor_point: Vec2::of(Align::Middle),
-            popup_point: Vec2::of(Align::Middle),
+            anchor_point: Vec2::of(Align::Center),
+            popup_point: Vec2::of(Align::Center),
             offset: Vec2::of(0),
         }
     }
@@ -170,13 +170,13 @@ pub(crate) fn resolve_placement(
 
         let anchor_coord = match placement.anchor_point[a] {
             Align::Start => anchor_pos,
-            Align::Middle => anchor_pos + anchor_size / 2,
+            Align::Center => anchor_pos + anchor_size / 2,
             Align::End => anchor_pos + anchor_size,
         };
 
         let popup_coord = match placement.popup_point[a] {
             Align::Start => 0,
-            Align::Middle => popup_size / 2,
+            Align::Center => popup_size / 2,
             Align::End => popup_size,
         };
 

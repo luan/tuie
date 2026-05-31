@@ -102,7 +102,7 @@ impl Chrome {
 
             let x: i32 = 1 + match title.align {
                 Align::Start => 0,
-                Align::Middle => (slack / 2) as i32,
+                Align::Center => (slack / 2) as i32,
                 Align::End => slack as i32,
             };
             let y: i32 = match title.edge {

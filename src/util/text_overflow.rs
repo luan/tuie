@@ -145,7 +145,7 @@ impl<'a> TextOverflowLineIterator<'a> {
     ) -> TextOverflowLineResult<'a> {
         let pad_left = match self.align {
             Align::Start => 0,
-            Align::Middle => (self.max_size.x.saturating_sub(width)) / 2,
+            Align::Center => (self.max_size.x.saturating_sub(width)) / 2,
             Align::End => self.max_size.x.saturating_sub(width + marker.1),
         };
         let result = TextOverflowLineResult {
@@ -337,7 +337,7 @@ impl<'a> TextOverflowLineIterator<'a> {
         }
 
         if total_width > self.max_size.x {
-            if self.align == Align::Middle && !self.config.wrap {
+            if self.align == Align::Center && !self.config.wrap {
                 let overflow_columns = tuie::terminal_display_width(line)
                     .saturating_sub(self.max_size.x) / 2;
                 let mut skipped_width = 0usize;
