@@ -130,7 +130,6 @@ pub mod prelude {
     pub use super::widget::widgets::split::SplitPaneChild;
     pub use super::widget::widgets::split::SplitPaneContent;
     pub use super::render::style::StyledStr;
-    pub use super::render::style::Span;
     pub use super::render::style::Style;
     pub use super::render::style::Stylize;
     pub use super::render::style::StyledString;

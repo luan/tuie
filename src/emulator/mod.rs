@@ -25,7 +25,7 @@ impl Emulator {
 
     /// Returns the most recently rendered frame as plain text.
     pub fn get_snapshot_text(&self) -> String {
-        self.get_snapshot().text
+        self.get_snapshot().into_string()
     }
 
     /// Asserts the rendered frame matches `lines` row for row.

@@ -22,20 +22,13 @@ fn color_grid(
 ) -> Vec<Vec<Option<Color>>> {
     let mut grid: Vec<Vec<Option<Color>>> = Vec::new();
     let mut row: Vec<Option<Color>> = Vec::new();
-    let mut span_i = 0usize;
-    let mut used = 0usize;
-    for ch in snap.text.chars() {
-        let color = snap.spans.get(span_i).map(|s| pick(&s.style)).unwrap_or(None);
-        if ch == '\n' {
-            grid.push(std::mem::take(&mut row));
-        } else {
-            row.push(color);
-        }
-        if !snap.spans.is_empty() {
-            used += ch.len_utf8();
-            while span_i < snap.spans.len() && used >= snap.spans[span_i].len {
-                used -= snap.spans[span_i].len;
-                span_i += 1;
+    for (chunk, style) in snap.iter_chunks(..) {
+        let color = pick(&style);
+        for ch in chunk.chars() {
+            if ch == '\n' {
+                grid.push(std::mem::take(&mut row));
+            } else {
+                row.push(color);
             }
         }
     }

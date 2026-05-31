@@ -409,15 +409,8 @@ fn nested_wraps_each_wrap_independently() {
 
 /// Returns the [`Style`] of the first byte of `text` in `snap`.
 fn style_at_text(snap: &StyledString, text: &str) -> Style {
-    let byte = snap.text.find(text).expect("text not found in snapshot");
-    let mut used = 0;
-    for span in &snap.spans {
-        if byte < used + span.len {
-            return span.style;
-        }
-        used += span.len;
-    }
-    panic!("byte offset past end of spans");
+    let byte = snap.as_str().find(text).expect("text not found in snapshot");
+    snap.style_at(byte)
 }
 
 #[test]

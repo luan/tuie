@@ -1,5 +1,5 @@
 use tuie::render::color::Color;
-use tuie::render::style::{AnsiStyleParser, Span, Style, StyleAttribute, StyledString, StyledStr, Stylize};
+use tuie::render::style::{AnsiStyleParser, Style, StyleAttribute, StyledString, StyledStr, Stylize};
 use tuie::render::underline::UnderlineType;
 
 #[test]
@@ -74,8 +74,7 @@ fn stylize_trait_on_str() {
 fn parse_one(input: &str) -> Style {
     let mut p = AnsiStyleParser::new();
     let out = p.parse_line(input);
-    let last = out.spans.last().copied().unwrap_or(Span::new(0, Style::new()));
-    last.style
+    out.style_at(out.len())
 }
 
 #[test]
@@ -123,9 +122,9 @@ fn ansi_default_color_codes() {
     let mut p = AnsiStyleParser::new();
     p.parse_line("\x1b[31;41mtext");
     let out = p.parse_line("\x1b[39;49mnext");
-    let last = out.spans.last().unwrap();
-    assert_eq!(last.style.fg, None);
-    assert_eq!(last.style.bg, None);
+    let style = out.style_at(out.len());
+    assert_eq!(style.fg, None);
+    assert_eq!(style.bg, None);
 }
 
 #[test]
@@ -133,23 +132,23 @@ fn ansi_parser_carries_state_across_lines() {
     let mut p = AnsiStyleParser::new();
     let _ = p.parse_line("\x1b[1mbold");
     let out = p.parse_line("still");
-    assert!(out.spans.last().unwrap().style.has_bold());
-    assert_eq!(out.text, "still");
+    assert!(out.style_at(out.len()).has_bold());
+    assert_eq!(out.as_str(), "still");
 }
 
 #[test]
 fn ansi_span_sizes_match_text_byte_lengths() {
     let mut p = AnsiStyleParser::new();
     let out = p.parse_line("\x1b[31mabc\x1b[32mde");
-    let total: usize = out.spans.iter().map(|s| s.len).sum();
-    assert_eq!(total, out.text.len());
+    let total: usize = out.iter_chunks(..).map(|(c, _)| c.len()).sum();
+    assert_eq!(total, out.len());
 }
 
 #[test]
-fn ansi_plain_text_has_no_spans() {
+fn ansi_plain_text_is_unstyled() {
     let out = StyledString::from_ansi("plain");
-    assert_eq!(out.text, "plain");
-    assert!(out.spans.is_empty());
+    assert_eq!(out.as_str(), "plain");
+    assert!(out.iter_chunks(..).all(|(_, st)| st == Style::new()));
 }
 
 fn parse(s: &str) -> Style {
@@ -348,26 +347,26 @@ fn parse_plain_writes_concrete_defaults() {
 fn styled_string_push_str_default_style() {
     let mut s = StyledString::new();
     s.push_str("hi");
-    assert_eq!(s.text, "hi");
-    assert!(s.spans.is_empty());
+    assert_eq!(s.as_str(), "hi");
+    assert!(s.iter_chunks(..).all(|(_, st)| st == Style::new()));
 }
 
 #[test]
-fn styled_string_push_span_default_does_not_allocate_spans() {
+fn styled_string_push_span_default_is_unstyled() {
     let mut s = StyledString::new();
     s.push_span(StyledStr::new("hi"));
-    assert_eq!(s.text, "hi");
-    assert!(s.spans.is_empty());
+    assert_eq!(s.as_str(), "hi");
+    assert!(s.iter_chunks(..).all(|(_, st)| st == Style::new()));
 }
 
 #[test]
-fn styled_string_push_span_styled_creates_spans() {
+fn styled_string_push_span_styled_applies_style() {
     let mut s = StyledString::new();
     s.push_span("hi".red());
-    assert_eq!(s.text, "hi");
-    let total: usize = s.spans.iter().map(|sp| sp.len).sum();
-    assert_eq!(total, s.text.len() + 1);
-    assert_eq!(s.spans[0].style.fg, Some(Color::RED));
+    assert_eq!(s.as_str(), "hi");
+    let total: usize = s.iter_chunks(..).map(|(c, _)| c.len()).sum();
+    assert_eq!(total, s.len());
+    assert_eq!(s.style_at(0).fg, Some(Color::RED));
 }
 
 #[test]
@@ -375,9 +374,8 @@ fn styled_string_push_span_merges_adjacent_equal_styles() {
     let mut s = StyledString::new();
     s.push_span("ab".red());
     s.push_span("cd".red());
-    let red_runs: Vec<_> = s.spans.iter().filter(|sp| sp.style.fg == Some(Color::RED)).collect();
-    assert_eq!(red_runs.len(), 1);
-    assert_eq!(red_runs[0].len, 4);
+    let chunks: Vec<_> = s.iter_chunks(..).collect();
+    assert_eq!(chunks, vec![("abcd", Style::new().fg(Color::RED))]);
 }
 
 #[test]
@@ -385,28 +383,77 @@ fn styled_string_style_range_applies_to_substring() {
     let mut s = StyledString::new();
     s.push_str("hello world");
     s.style_range(0..5, |st| st.set_bold(true));
-    let total: usize = s.spans.iter().map(|sp| sp.len).sum();
-    assert_eq!(total, s.text.len() + 1);
+    let total: usize = s.iter_chunks(..).map(|(c, _)| c.len()).sum();
+    assert_eq!(total, s.len());
     let bold_len: usize = s
-        .spans
-        .iter()
-        .filter(|sp| sp.style.has_bold())
-        .map(|sp| sp.len)
+        .iter_chunks(..)
+        .filter(|(_, st)| st.has_bold())
+        .map(|(c, _)| c.len())
         .sum();
     assert_eq!(bold_len, 5);
 }
 
 #[test]
-fn styled_string_trim_left_drops_bytes_and_spans() {
+fn styled_string_style_range_covers_eof_position() {
+    let mut s = StyledString::new();
+    s.push_str("hi");
+    s.style_range(0..s.len() + 1, |st| st.set_bold(true));
+    assert!(s.style_at(s.len()).has_bold());
+}
+
+#[test]
+fn styled_string_style_at_span_boundaries() {
+    let mut s = StyledString::new();
+    s.push_span("abc".red());
+    s.push_span("def".blue());
+    assert_eq!(s.style_at(0).fg, Some(Color::RED));
+    assert_eq!(s.style_at(2).fg, Some(Color::RED));
+    assert_eq!(s.style_at(3).fg, Some(Color::BLUE));
+    assert_eq!(s.style_at(5).fg, Some(Color::BLUE));
+    assert_eq!(s.style_at(s.len()), Style::new());
+}
+
+#[test]
+fn styled_string_iter_chunks_ranges() {
+    let mut s = StyledString::new();
+    s.push_span("abc".red());
+    s.push_span("def".blue());
+    let full: Vec<_> = s.iter_chunks(..).collect();
+    assert_eq!(full, vec![("abc", Style::new().fg(Color::RED)), ("def", Style::new().fg(Color::BLUE))]);
+    let ranged: Vec<_> = s.iter_chunks(2..4).collect();
+    assert_eq!(ranged, vec![("c", Style::new().fg(Color::RED)), ("d", Style::new().fg(Color::BLUE))]);
+    let clamped: Vec<_> = s.iter_chunks(4..100).collect();
+    assert_eq!(clamped, vec![("ef", Style::new().fg(Color::BLUE))]);
+}
+
+#[test]
+fn styled_string_iter_chunks_unstyled_yields_one_default_chunk() {
+    let mut s = StyledString::new();
+    s.push_str("hello");
+    let chunks: Vec<_> = s.iter_chunks(..).collect();
+    assert_eq!(chunks, vec![("hello", Style::new())]);
+}
+
+#[test]
+fn styled_string_iter_chunks_excludes_eof_position() {
+    let mut s = StyledString::new();
+    s.push_span("hi".red());
+    s.style_range(0..s.len() + 1, |st| st.set_bold(true));
+    let total: usize = s.iter_chunks(..).map(|(c, _)| c.len()).sum();
+    assert_eq!(total, s.len());
+}
+
+#[test]
+fn styled_string_trim_left_drops_bytes_and_styles() {
     let mut s = StyledString::new();
     s.push_span("abc".red());
     s.push_span("def".blue());
     s.trim_left(3);
-    assert_eq!(s.text, "def");
-    let total: usize = s.spans.iter().map(|sp| sp.len).sum();
-    assert_eq!(total, s.text.len() + 1);
-    assert!(s.spans.iter().any(|sp| sp.style.fg == Some(Color::BLUE)));
-    assert!(!s.spans.iter().any(|sp| sp.style.fg == Some(Color::RED)));
+    assert_eq!(s.as_str(), "def");
+    let total: usize = s.iter_chunks(..).map(|(c, _)| c.len()).sum();
+    assert_eq!(total, s.len());
+    assert!(s.iter_chunks(..).any(|(_, st)| st.fg == Some(Color::BLUE)));
+    assert!(!s.iter_chunks(..).any(|(_, st)| st.fg == Some(Color::RED)));
 }
 
 #[test]
@@ -414,53 +461,126 @@ fn styled_string_trim_left_zero_is_noop() {
     let mut s = StyledString::new();
     s.push_str("hello");
     s.trim_left(0);
-    assert_eq!(s.text, "hello");
+    assert_eq!(s.as_str(), "hello");
 }
 
 #[test]
-fn styled_string_collapse_spans_merges_equal_neighbours() {
-    let mut s = StyledString {
-        text: "abcdef".to_string(),
-        spans: vec![
-            Span { style: Style::new().bold(), len: 2 },
-            Span { style: Style::new().bold(), len: 2 },
-            Span { style: Style::new().bold(), len: 2 },
-            Span::new(1, Style::new()),
-        ],
-    };
-    s.collapse_spans();
-    let bold: Vec<_> = s.spans.iter().filter(|sp| sp.style.has_bold()).collect();
-    assert_eq!(bold.len(), 1);
-    assert_eq!(bold[0].len, 6);
+fn styled_string_equal_style_neighbours_merge_into_one_chunk() {
+    let mut s = StyledString::new();
+    s.push_str("abcdef");
+    s.style_range(0..2, |st| st.set_bold(true));
+    s.style_range(2..4, |st| st.set_bold(true));
+    s.style_range(4..6, |st| st.set_bold(true));
+    let chunks: Vec<_> = s.iter_chunks(..).collect();
+    assert_eq!(chunks, vec![("abcdef", Style::new().bold())]);
 }
 
 #[test]
-fn styled_string_collapse_drops_zero_sized_spans() {
-    let mut s = StyledString {
-        text: "ab".to_string(),
-        spans: vec![
-            Span { style: Style::new().bold(), len: 0 },
-            Span { style: Style::new(), len: 2 },
-            Span::new(1, Style::new()),
-        ],
-    };
-    s.collapse_spans();
-    assert!(s.spans.iter().all(|sp| sp.len > 0));
+fn styled_string_iter_chunks_never_yields_empty_chunks() {
+    let mut s = StyledString::new();
+    s.push_str("ab");
+    s.style_range(0..2, |st| st.set_bold(true));
+    assert!(s.iter_chunks(..).all(|(c, _)| !c.is_empty()));
 }
 
 #[test]
-fn styled_str_to_styled_string_default_skips_spans() {
+fn styled_str_to_styled_string_default_is_unstyled() {
     let ss: StyledString = StyledStr::new("plain").into();
-    assert_eq!(ss.text, "plain");
-    assert!(ss.spans.is_empty());
+    assert_eq!(ss.as_str(), "plain");
+    assert!(ss.iter_chunks(..).all(|(_, st)| st == Style::new()));
 }
 
 #[test]
-fn styled_str_to_styled_string_styled_has_spans() {
+fn styled_str_to_styled_string_styled_applies_style() {
     let ss: StyledString = "x".bold().into();
-    assert_eq!(ss.text, "x");
-    let total: usize = ss.spans.iter().map(|sp| sp.len).sum();
-    assert_eq!(total, ss.text.len() + 1);
-    assert!(ss.spans[0].style.has_bold());
+    assert_eq!(ss.as_str(), "x");
+    let total: usize = ss.iter_chunks(..).map(|(c, _)| c.len()).sum();
+    assert_eq!(total, ss.len());
+    assert!(ss.style_at(0).has_bold());
+}
+
+#[test]
+fn styled_string_eq_ignores_span_representation() {
+    let mut s = StyledString::from("hi");
+    s.style_range(0..2, |st| *st = Style::new().bold());
+    s.style_range(0..2, |st| *st = Style::new());
+    assert_eq!(s, StyledString::from("hi"));
+}
+
+#[test]
+fn styled_string_drop_to_unstyled_region_equals_plain() {
+    let mut s = StyledString::new();
+    s.push_span("ab".red());
+    s.push_str("cd");
+    s.trim_left(2);
+    assert_eq!(s, StyledString::from("cd"));
+}
+
+#[test]
+fn styled_string_replace_range_preserves_surrounding_styles() {
+    let mut s = StyledString::new();
+    s.push_span("abc".red());
+    s.push_span("def".blue());
+    s.replace_range(2..4, "XY");
+    assert_eq!(s.as_str(), "abXYef");
+    assert_eq!(s.style_at(0).fg, Some(Color::RED));
+    assert_eq!(s.style_at(2).fg, Some(Color::RED));
+    assert_eq!(s.style_at(3).fg, Some(Color::RED));
+    assert_eq!(s.style_at(4).fg, Some(Color::BLUE));
+}
+
+#[test]
+fn styled_string_replace_range_accepts_open_ranges() {
+    let mut s = StyledString::new();
+    s.push_span("abc".red());
+    s.push_span("def".blue());
+    s.replace_range(3.., "!");
+    assert_eq!(s.as_str(), "abc!");
+    assert_eq!(s.style_at(0).fg, Some(Color::RED));
+    assert_eq!(s.style_at(3).fg, Some(Color::BLUE));
+}
+
+#[test]
+fn styled_string_replace_range_unstyled_stays_unstyled() {
+    let mut s = StyledString::from("hello world");
+    s.replace_range(0..5, "goodbye");
+    assert_eq!(s, StyledString::from("goodbye world"));
+}
+
+#[test]
+fn styled_string_style_range_accepts_open_ranges() {
+    let mut s = StyledString::from("abcdef");
+    s.style_range(2.., |st| st.set_bold(true));
+    assert!(!s.style_at(0).has_bold());
+    assert!(s.style_at(2).has_bold());
+    assert!(s.style_at(5).has_bold());
+    assert!(!s.style_at(s.len()).has_bold());
+}
+
+#[test]
+fn styled_string_append_preserves_styles() {
+    let mut s = StyledString::new();
+    s.push_span("ab".red());
+    let mut other = StyledString::from("cd");
+    other.style_range(0..1, |st| st.set_bold(true));
+    s.append(&other);
+    assert_eq!(s.as_str(), "abcd");
+    assert_eq!(s.style_at(0).fg, Some(Color::RED));
+    assert!(s.style_at(2).has_bold());
+    assert_eq!(s.style_at(3), Style::new());
+}
+
+#[test]
+fn styled_string_default_is_empty() {
+    assert_eq!(StyledString::default(), StyledString::new());
+}
+
+#[test]
+fn styled_string_display_writes_plain_text() {
+    let mut s = StyledString::new();
+    s.push_span("ab".red());
+    s.push_str("cd");
+    assert_eq!(s.to_string(), "abcd");
+    assert_eq!(s.as_ref(), "abcd");
 }
 
