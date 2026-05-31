@@ -444,11 +444,11 @@ fn styled_string_iter_chunks_excludes_eof_position() {
 }
 
 #[test]
-fn styled_string_trim_left_drops_bytes_and_styles() {
+fn styled_string_drop_start_drops_bytes_and_styles() {
     let mut s = StyledString::new();
     s.push_span("abc".red());
     s.push_span("def".blue());
-    s.trim_left(3);
+    s.drop_start(3);
     assert_eq!(s.as_str(), "def");
     let total: usize = s.iter_chunks(..).map(|(c, _)| c.len()).sum();
     assert_eq!(total, s.len());
@@ -457,10 +457,10 @@ fn styled_string_trim_left_drops_bytes_and_styles() {
 }
 
 #[test]
-fn styled_string_trim_left_zero_is_noop() {
+fn styled_string_drop_start_zero_is_noop() {
     let mut s = StyledString::new();
     s.push_str("hello");
-    s.trim_left(0);
+    s.drop_start(0);
     assert_eq!(s.as_str(), "hello");
 }
 
@@ -512,7 +512,7 @@ fn styled_string_drop_to_unstyled_region_equals_plain() {
     let mut s = StyledString::new();
     s.push_span("ab".red());
     s.push_str("cd");
-    s.trim_left(2);
+    s.drop_start(2);
     assert_eq!(s, StyledString::from("cd"));
 }
 

@@ -592,7 +592,7 @@ impl StyledString {
     }
 
     /// Drops the first `n` bytes from `text` and adjusts spans to match.
-    pub fn trim_left(&mut self, n: usize) {
+    pub fn drop_start(&mut self, n: usize) {
         if n == 0 {
             return;
         }
@@ -610,7 +610,7 @@ impl StyledString {
     }
 
     /// Drops the last `n` bytes from `text` and adjusts spans to match.
-    pub fn trim_right(&mut self, n: usize) {
+    pub fn drop_end(&mut self, n: usize) {
         if n == 0 {
             return;
         }
