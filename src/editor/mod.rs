@@ -132,6 +132,13 @@ impl<T: TextDocument> Editor<T> {
         self.state.select_all(text);
     }
 
+    /// Places the cursor and anchor at the given byte offsets.
+    pub fn set_selection(&mut self, text: &T, cursor: usize, anchor: usize) {
+        self.state.cursor.set_index(text, cursor);
+        self.state.anchor.set_index(text, anchor);
+        self.state.update_preferred_col(text);
+    }
+
     /// Sets whether the selection includes the grapheme under the cursor.
     pub fn set_inclusive_selection(&mut self, inclusive: bool) {
         self.state.inclusive_selection = inclusive;
@@ -142,32 +149,10 @@ impl<T: TextDocument> Editor<T> {
         self.state.is_inclusive_selection()
     }
 
-    /// Replaces the entire document content with `s`.
-    pub fn replace_all(&mut self, text: &mut T, s: &str) {
-        self.state.replace_all(text, s);
-    }
-
-    /// Replaces the entire document with `s`, placing cursor and anchor at the given byte offsets.
-    pub fn replace_all_with_selection(
-        &mut self, text: &mut T, s: &str,
-        cursor: usize,
-        anchor: usize,
-    ) {
-        let len = text.len();
-        self.state.replace_range(text, 0..len, s);
-        self.state.cursor.set_index(text, cursor);
-        self.state.anchor.set_index(text, anchor);
-        self.state.update_preferred_col(text);
-    }
-
-    /// Replaces the entire document with `s`, moving the cursor to the start.
+    /// Replaces the entire document with `s`, moving the cursor to the end.
     pub fn set_content(&mut self, text: &mut T, s: &str) {
         self.state.seal_undo_group();
-        let len = text.len();
-        self.state.replace_range(text, 0..len, s);
-        self.state.cursor.move_document_edge(text, Sign::Negative);
-        self.state.anchor = self.state.cursor.clone();
-        self.state.update_preferred_col(text);
+        self.state.set_content(text, s);
     }
 
     /// Moves the cursor one cell, collapsing any selection toward the leading edge.

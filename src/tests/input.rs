@@ -77,10 +77,10 @@ fn home_and_end_move_cursor() {
 fn arrow_keys_move_cursor() {
     let mut input = Input::new().content("abc");
     let mut term = Emulator::new(&mut *input, Vec2::new(6, 1));
-    term.update(&mut *input, &[chord!(Right).into(), chord!('Z').into()]);
-    assert_eq!(input.get_string(), "aZbc");
-    term.update(&mut *input, &[chord!(Right).into(), chord!('Q').into()]);
-    assert_eq!(input.get_string(), "aZbQc");
+    term.update(&mut *input, &[chord!(Left).into(), chord!('Z').into()]);
+    assert_eq!(input.get_string(), "abZc");
+    term.update(&mut *input, &[chord!(Left).into(), chord!(Left).into(), chord!('Q').into()]);
+    assert_eq!(input.get_string(), "aQbZc");
 }
 
 #[test]

@@ -8,7 +8,10 @@ type Vi = ViBindings<Text>;
 
 fn make(content: &str) -> Box<Input> {
     tuie::clipboard::clear();
-    Input::new().multiline().bindings(ViBindings::new).content(content)
+    let mut input = Input::new().multiline().bindings(ViBindings::new).content(content);
+    let (editor, text) = input.get_editor_mut();
+    editor.move_cursor_document_edge(text, Sign::Negative);
+    input
 }
 
 fn mode(input: &Input) -> ViMode {

@@ -48,8 +48,9 @@ impl Input {
         };
         let new_cursor = (cursor_idx - newlines_before(cursor_idx)).min(stripped_len);
         let new_anchor = (anchor_idx - newlines_before(anchor_idx)).min(stripped_len);
-        self.editor
-            .replace_all_with_selection(&mut *self.text, &stripped, new_cursor, new_anchor);
+        let len = self.text.len();
+        self.editor.replace_range(&mut *self.text, 0..len, &stripped);
+        self.editor.set_selection(&*self.text, new_cursor, new_anchor);
     }
 
     fn update_highlight(&mut self) {

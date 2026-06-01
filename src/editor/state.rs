@@ -799,7 +799,7 @@ impl<T: TextDocument> EditorState<T> {
     }
 
     /// Replaces the entire document content with `s`.
-    pub fn replace_all(&mut self, text: &mut T, s: &str) {
+    pub fn set_content(&mut self, text: &mut T, s: &str) {
         let len = text.len();
         self.replace_range(text, 0..len, s);
         let end = text.len();
