@@ -31,7 +31,7 @@ pub(crate) fn hit_test_z(
     path: &mut Vec<WidgetId>,
     excluded: &[WidgetId],
 ) -> Option<(WidgetId, Layer)> {
-    let pos = pos - widget.subcell_offset();
+    let pos = pos - widget.get_subcell_offset();
     let mut best: Option<(WidgetId, Layer, Vec<WidgetId>)> = None;
     widget.each_child(
         &mut |child| {
@@ -76,12 +76,12 @@ pub(crate) fn path_subcell_offset(
     if path.is_empty() || root.get_id() != path[0] {
         return Vec2::of(0i32);
     }
-    let mut total = root.subcell_offset();
+    let mut total = root.get_subcell_offset();
     let mut current: &dyn Widget = root;
     for &next_id in &path[1..] {
         let Some(c) = current.get_child(next_id) else { break };
         current = c;
-        total = total + current.subcell_offset();
+        total = total + current.get_subcell_offset();
     }
     let cp = cell_px();
     Axis2D::map(|a| (total[a] * cp[a] as f32).round() as i32)
@@ -98,7 +98,7 @@ pub(crate) fn window_to_leaf(
     let mut pos = window_pos;
     let mut current: &dyn Widget = root;
     for &next_id in &path[1..] {
-        pos = pos - current.subcell_offset();
+        pos = pos - current.get_subcell_offset();
         let Some(c) = current.get_child(next_id) else { break };
         current = c;
     }

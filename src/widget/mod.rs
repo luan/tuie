@@ -1016,9 +1016,9 @@ pub trait DelegateWidget: 'static {
         self.get_delegate_mut().before_focus_move(selected_child, axis, direction);
     }
 
-    /// Override hook for [`Widget::subcell_offset`].
-    fn override_subcell_offset(&self) -> Vec2<f32> {
-        self.get_delegate().subcell_offset()
+    /// Override hook for [`Widget::get_subcell_offset`].
+    fn override_get_subcell_offset(&self) -> Vec2<f32> {
+        self.get_delegate().get_subcell_offset()
     }
 
     /// Called after [`Widget::before_layout`] on the delegate.
@@ -1234,8 +1234,8 @@ impl<T: DelegateWidget> Widget for T {
         self.after_before_focus_move(selected_child, axis, direction);
     }
 
-    fn subcell_offset(&self) -> Vec2<f32> {
-        self.override_subcell_offset()
+    fn get_subcell_offset(&self) -> Vec2<f32> {
+        self.override_get_subcell_offset()
     }
 }
 
@@ -1528,7 +1528,7 @@ pub trait Widget: std::any::Any {
     ) {}
 
     /// Returns the render-time shift of this widget's content in cell fractions.
-    fn subcell_offset(&self) -> Vec2<f32> {
+    fn get_subcell_offset(&self) -> Vec2<f32> {
         Vec2::of(0.0)
     }
 }
@@ -1616,8 +1616,8 @@ pub trait WidgetMethods: Widget {
     }
 
     /// Returns true when this widget is anywhere on the current focus chain.
-    fn is_focus_chain(&self) -> bool {
-        super::runtime::is_focus_chain(self.get_id())
+    fn in_focus_chain(&self) -> bool {
+        super::runtime::in_focus_chain(self.get_id())
     }
 
     /// Returns the content size.

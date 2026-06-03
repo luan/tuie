@@ -656,7 +656,7 @@ pub fn is_focused(id: WidgetId<impl ?Sized>) -> bool {
 }
 
 /// Returns true when `id` lies anywhere on the focus chain.
-pub fn is_focus_chain(id: WidgetId<impl ?Sized>) -> bool {
+pub fn in_focus_chain(id: WidgetId<impl ?Sized>) -> bool {
     let id = id.untyped();
     with_ctx(|ctx| ctx.focus_chain.contains(&id))
 }
@@ -739,94 +739,48 @@ fn process_keys_interleaved(root: &mut dyn Widget) {
         let mut pending = false;
         let mut total_consumed = 0;
 
-        if path.is_empty() {
-            with_runtime_mut(|rt| {
+        let passes: Vec<(usize, bool)> = if path.is_empty() {
+            vec![(0, false), (0, true)]
+        } else {
+            (0..path.len()).map(|i| (i, false))
+                .chain((0..path.len()).rev().map(|i| (i, true)))
+                .collect()
+        };
+
+        with_runtime_mut(|rt| {
+            for (depth, unhandled) in passes {
                 if rt.key_queue.is_empty() {
-                    return;
+                    break;
                 }
                 let mut key_queue = rt.key_queue.clone();
                 let flushing = rt.key_queue_flushing;
                 let (result, consumed) = {
                     let active_root = rt.get_active_root_mut(root);
-                    dispatch_input(active_root, &mut key_queue, flushing, false)
+                    let target = if path.is_empty() {
+                        active_root
+                    } else {
+                        match walk_path_mut(active_root, &path[..=depth]) {
+                            Some(target) => target,
+                            None => continue,
+                        }
+                    };
+                    dispatch_input(target, &mut key_queue, flushing, unhandled)
                 };
                 rt.flush_events(root);
                 match result {
                     InputResult::Handled if consumed > 0 => {
                         handled = true;
                         total_consumed = consumed;
+                        break;
                     }
                     InputResult::Pending => {
                         pending = true;
+                        break;
                     }
                     _ => {}
                 }
-            });
-        }
-
-        if !handled && !pending {
-            with_runtime_mut(|rt| {
-                for i in 0..path.len() {
-                    if rt.key_queue.is_empty() {
-                        break;
-                    }
-                    let mut key_queue = rt.key_queue.clone();
-                    let flushing = rt.key_queue_flushing;
-                    let (result, consumed) = {
-                        let active_root = rt.get_active_root_mut(root);
-                        match walk_path_mut(active_root, &path[..=i]) {
-                            Some(target) => dispatch_input(target, &mut key_queue, flushing, false),
-                            None => continue,
-                        }
-                    };
-                    rt.flush_events(root);
-                    match result {
-                        InputResult::Handled if consumed > 0 => {
-                            handled = true;
-                            total_consumed = consumed;
-                            break;
-                        }
-                        InputResult::Pending => {
-                            pending = true;
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            });
-        }
-
-        if !handled && !pending {
-            with_runtime_mut(|rt| {
-                for i in (0..path.len()).rev() {
-                    if rt.key_queue.is_empty() {
-                        break;
-                    }
-                    let mut key_queue = rt.key_queue.clone();
-                    let flushing = rt.key_queue_flushing;
-                    let (result, consumed) = {
-                        let active_root = rt.get_active_root_mut(root);
-                        match walk_path_mut(active_root, &path[..=i]) {
-                            Some(target) => dispatch_input(target, &mut key_queue, flushing, true),
-                            None => continue,
-                        }
-                    };
-                    rt.flush_events(root);
-                    match result {
-                        InputResult::Handled if consumed > 0 => {
-                            handled = true;
-                            total_consumed = consumed;
-                            break;
-                        }
-                        InputResult::Pending => {
-                            pending = true;
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            });
-        }
+            }
+        });
 
         let cont = with_runtime_mut(|rt| {
             if handled {

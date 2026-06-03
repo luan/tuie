@@ -182,7 +182,7 @@ impl List {
         })
     }
 
-    fn subcell_offset(&self) -> Vec2<f32> {
+    fn get_subcell_offset(&self) -> Vec2<f32> {
         if !crate::runtime::is_gui() {
             return Vec2::of(0.0);
         }
@@ -1407,7 +1407,7 @@ impl Widget for List {
         if !self.viewport_contains(pos) {
             return None;
         }
-        let pos = pos - self.subcell_offset();
+        let pos = pos - self.get_subcell_offset();
         for item in &self.items {
             if !Self::item_contains(&*item.widget, pos) {
                 continue;
@@ -1438,7 +1438,7 @@ impl Widget for List {
         if !self.viewport_contains(pos) {
             return None;
         }
-        let pos = pos - self.subcell_offset();
+        let pos = pos - self.get_subcell_offset();
         for item in &self.items {
             if !Self::item_contains(&*item.widget, pos) {
                 continue;

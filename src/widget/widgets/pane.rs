@@ -376,7 +376,7 @@ impl Pane {
         })
     }
 
-    fn subcell_offset(&self) -> Vec2<f32> {
+    fn get_subcell_offset(&self) -> Vec2<f32> {
         if !crate::runtime::is_gui() {
             return Vec2::of(0.0);
         }
@@ -1485,7 +1485,7 @@ impl Widget for Pane {
             return None;
         }
 
-        let pos = pos - self.subcell_offset();
+        let pos = pos - self.get_subcell_offset();
 
         for child in self.children.iter() {
             if Self::child_contains(&**child, pos) {
@@ -1528,7 +1528,7 @@ impl Widget for Pane {
             return None;
         }
 
-        let pos = pos - self.subcell_offset();
+        let pos = pos - self.get_subcell_offset();
 
         for child in self.children.iter() {
             if Self::child_contains(&**child, pos) {
