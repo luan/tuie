@@ -2916,6 +2916,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
         self.leave_visual(state, text);
         state.delete_selection(text);
         state.paste(text);
+        self.clamp_cursor_to_line_end(state, text);
     }
 
     fn visual_action_click(&mut self, state: &mut EditorState<T>, text: &mut T, event: &InputEvent) {
