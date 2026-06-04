@@ -92,6 +92,24 @@ fn double_esc() {
 }
 
 #[test]
+fn alt_chars_that_double_as_introducers() {
+    let cases = [
+        (b"\x1BP".as_slice(), 'P'),
+        (b"\x1BO", 'O'),
+        (b"\x1B[", '['),
+        (b"\x1B]", ']'),
+        (b"\x1B_", '_'),
+    ];
+    for (bytes, c) in cases {
+        assert_eq!(
+            parse_one(bytes),
+            key(Key::Char(c), no_mods().with(Modifier::Alt)),
+            "for M-{c}"
+        );
+    }
+}
+
+#[test]
 fn ss3_arrows_and_fkeys() {
     assert_eq!(parse_one(b"\x1BOA"), key(Key::Arrow(Direction2D::Up), no_mods()));
     assert_eq!(parse_one(b"\x1BOP"), key(Key::F(1), no_mods()));
@@ -306,6 +324,19 @@ fn xtversion_reply() {
         parse_one(b"\x1BP>|kitty 0.36.4\x1B\\"),
         ParsedEvent::XtVersion("kitty 0.36.4".to_string())
     );
+}
+
+#[test]
+fn dcs_reply_split_across_feeds() {
+    let mut p = Parser::new();
+    p.feed_all(b"\x1BP>|kit");
+    p.flush_escape();
+    p.feed_all(b"ty 0.36.4\x1B\\");
+    assert_eq!(
+        p.next(),
+        Some(ParsedEvent::XtVersion("kitty 0.36.4".to_string()))
+    );
+    assert!(p.next().is_none());
 }
 
 #[test]

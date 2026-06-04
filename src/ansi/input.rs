@@ -66,12 +66,23 @@ impl Parser {
         self.out.push_back(event);
     }
 
-    /// Resolves a pending lone `ESC` byte as an Escape keypress.
+    /// Resolves a pending lone `ESC` or bare sequence introducer as a keypress.
     pub fn flush_escape(&mut self) {
-        if self.state == State::Esc {
-            self.state = State::Ground;
-            self.push_key(Key::Esc, Modifiers::new());
-        }
+        let b = match self.state {
+            State::Esc => {
+                self.state = State::Ground;
+                self.push_key(Key::Esc, Modifiers::new());
+                return;
+            }
+            State::Ss3 => b'O',
+            State::Csi if self.buf.is_empty() => b'[',
+            State::Dcs if self.buf.is_empty() => b'P',
+            State::Osc if self.buf.is_empty() => b']',
+            State::Apc if self.buf.is_empty() => b'_',
+            _ => return,
+        };
+        self.state = State::Ground;
+        self.ground(b, true);
     }
 
     /// Feeds one input byte, advancing the state machine.
