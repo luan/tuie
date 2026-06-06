@@ -5,7 +5,7 @@ use crate::widget::chrome::ChromeHost;
 use crate::widget::align::{AlignSpec, FlexAlign, Place};
 use crate::widget::{flow_output_size, measure_output_size};
 use crate::util::stack_pool::StackPool;
-use crate::widget::flex::{self, AsFlexItem, FlexItem};
+use crate::widget::flex::{self, FlexItem};
 use chord_macro::chord;
 use sign::Directional;
 
@@ -15,33 +15,29 @@ thread_local! {
 
 #[derive(Clone, Copy)]
 struct Slot {
-    item: FlexItem,
     measured: Vec2<u16>,
     commit: Vec2<u16>,
 }
 
 impl Slot {
     const EMPTY: Self = Self {
-        item: FlexItem::new(0, 0, 0, 0),
         measured: Vec2::of(0),
         commit: Vec2::of(0),
     };
 }
 
-impl AsFlexItem for Slot {
-    fn flex_item(&self) -> &FlexItem { &self.item }
-    fn flex_item_mut(&mut self) -> &mut FlexItem { &mut self.item }
-}
-
 #[derive(Default)]
 struct FlexState {
     slots: Vec<Slot>,
+    items: Vec<FlexItem>,
 }
 
 impl FlexState {
     fn resize_to(&mut self, n: usize) {
         self.slots.clear();
         self.slots.resize(n, Slot::EMPTY);
+        self.items.clear();
+        self.items.resize(n, FlexItem::new(0, 0, 0, 0));
     }
 }
 
@@ -489,9 +485,9 @@ impl Pane {
             let basis = Self::derive_basis(&**child, measured, main);
             let min = Self::derive_min_main_eff(&**child, measured, main);
             let max = child.get_layout().constraints.max_size[main];
-            state.slots[i].item = FlexItem::new(basis, min, max, child.get_flex());
+            state.items[i] = FlexItem::new(basis, min, max, child.get_flex());
         }
-        flex::resolve(&mut state.slots, container_main, gap_total);
+        flex::resolve(&mut state.items, container_main, gap_total);
 
         for (i, child) in self.children.iter().enumerate() {
             let cl = child.get_layout();
@@ -501,7 +497,7 @@ impl Pane {
             let flow_axis = child.get_flow_axis();
             let child_mode = cl.align.get_mode(cross).unwrap_or(cross_mode);
             let stretching = child_mode == FlexAlign::Stretch;
-            let used_main = state.slots[i].item.target;
+            let used_main = state.items[i].target;
             let measured_cross = state.slots[i].measured[cross];
 
             let used_cross = if stretching && !cross_scroll {
