@@ -70,17 +70,12 @@ macro_rules! config_module {
                 CONFIG.with(|c| c.get())
             }
 
-            /// Replaces the configuration.
-            pub fn set(cfg: super::$cfg) {
-                CONFIG.with(|c| c.set(cfg));
-                $crate::dirty_layout();
-            }
-
             /// Applies `f` to the configuration in place.
             pub fn update(f: impl FnOnce(&mut super::$cfg)) {
                 let mut cfg = get();
                 f(&mut cfg);
-                set(cfg);
+                CONFIG.with(|c| c.set(cfg));
+                $crate::dirty_layout();
             }
         }
     };
