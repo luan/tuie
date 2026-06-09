@@ -373,7 +373,7 @@ impl Pane {
     }
 
     fn get_subcell_offset(&self) -> Vec2<f32> {
-        if !crate::runtime::is_gui() {
+        if !crate::is_gui() {
             return Vec2::of(0.0);
         }
         let Some(sc) = self.scroll.as_deref() else {
@@ -1107,12 +1107,12 @@ impl Widget for Pane {
             .as_deref()
             .map(|sc| sc.subcell_scroll)
             .unwrap_or(Vec2::of(0.0));
-        let has_subcell = crate::runtime::is_gui() && fract != Vec2::of(0.0);
+        let has_subcell = crate::is_gui() && fract != Vec2::of(0.0);
 
         if has_subcell {
             #[cfg(feature = "gui")]
             {
-                let cell_px = crate::runtime::get_runtime_info().cell_size.unwrap_or(Vec2::of(1));
+                let cell_px = crate::get_runtime_info().cell_size.unwrap_or(Vec2::of(1));
                 let subcell = Axis2D::map(|a| -((fract[a] * cell_px[a] as f32).round() as i32));
                 let a = self.orientation;
                 let cross = a.flip();

@@ -57,7 +57,7 @@ impl Widget for Tooltip {
     fn layout_flow(&mut self, allocated: Vec2<u16>) -> Vec2<u16> {
         let anchor_out = flow_child(&mut *self.anchor, allocated);
         if let Some(body) = &mut self.body {
-            let canvas = crate::runtime::get_runtime_info().size;
+            let canvas = crate::get_runtime_info().size;
             let body_max = body.get_layout().constraints.max_size;
             let alloc_x = body_max.x.min(canvas.x);
             let body_input = Vec2::new(alloc_x, canvas.y);

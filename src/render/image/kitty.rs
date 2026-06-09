@@ -77,7 +77,7 @@ impl ImageSystem {
     fn new() -> Self {
         let pid = std::process::id();
         let pid_high = (pid & Self::PID_MASK) << Self::SLOT_BITS;
-        crate::runtime::on_quit(emit_free_escapes_for_live_slots);
+        crate::on_quit(emit_free_escapes_for_live_slots);
         Self {
             pid_high,
             slots: Vec::new(),
@@ -221,7 +221,7 @@ fn placement_for(
 }
 
 fn is_tmux() -> bool {
-    crate::runtime::get_runtime_info()
+    crate::get_runtime_info()
         .xtversion
         .is_some_and(|v| v.starts_with("tmux "))
 }
@@ -315,7 +315,7 @@ fn cover_placement(
 ) -> (Vec2<u16>, Vec2<u16>) {
     let widget_clamped = Vec2::new(widget.x.min(max_cells), widget.y.min(max_cells));
     let src_px = source.get_pixel_dims();
-    let Some(cell_px) = crate::runtime::get_runtime_info().cell_size else {
+    let Some(cell_px) = crate::get_runtime_info().cell_size else {
         return (widget_clamped, Vec2::of(0u16));
     };
     if src_px.x == 0
@@ -492,7 +492,7 @@ pub(crate) fn dispatch(
     let placement = placement_for(&source.inner, &pixel_slot, vp);
 
     let tmux = is_tmux();
-    let in_gui = crate::runtime::is_gui();
+    let in_gui = crate::is_gui();
     let tick = begin_render(&pixel_slot);
 
     if !in_gui {

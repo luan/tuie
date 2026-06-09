@@ -19,7 +19,7 @@ pub(crate) fn rect_center(r: Rect<i32, u16>) -> Vec2<i32> {
 }
 
 pub(crate) fn cell_px() -> Vec2<i32> {
-    match crate::runtime::get_runtime_info().cell_size {
+    match crate::get_runtime_info().cell_size {
         Some(px) => Vec2::new(px.x as i32, px.y as i32),
         None => Vec2::of(1i32),
     }

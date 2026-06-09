@@ -120,7 +120,7 @@ pub(crate) fn pick_protocol() -> ImageProtocol {
         return forced;
     }
     let caps = crate::runtime::get_image_caps();
-    if crate::runtime::is_gui() {
+    if crate::is_gui() {
         ImageProtocol::Kitty
     } else if caps.supports_sixel {
         ImageProtocol::Sixel

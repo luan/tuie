@@ -47,7 +47,7 @@ impl ScrollbarThumb {
 
     /// Returns per-axis corner-extension flags and a TTY corner-sharing flag for two-axis scrollbar layout.
     pub fn corner_extension(&self, both_visible: bool) -> (Vec2<bool>, bool) {
-        let is_gui = crate::runtime::is_gui();
+        let is_gui = crate::is_gui();
         let share_corner = both_visible && self.has_half_cell(Axis2D::Y) && !is_gui;
         let extend_into_corner_gui = both_visible && is_gui;
         let extend = Axis2D::map(|axis| {
@@ -362,8 +362,8 @@ impl ScrollbarState {
         F: Fn(&W) -> Option<(&ScrollbarStyle, &ScrollbarState)> + 'static,
     {
         #[cfg(feature = "gui")]
-        if crate::runtime::is_gui() {
-            if let Some(cell_px) = crate::runtime::get_runtime_info()
+        if crate::is_gui() {
+            if let Some(cell_px) = crate::get_runtime_info()
                 .cell_size
                 .map(|c| c[axis])
                 .filter(|&v| v > 1)

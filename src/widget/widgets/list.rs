@@ -183,7 +183,7 @@ impl List {
     }
 
     fn get_subcell_offset(&self) -> Vec2<f32> {
-        if !crate::runtime::is_gui() {
+        if !crate::is_gui() {
             return Vec2::of(0.0);
         }
         Axis2D::map(|a| -self.scroll.subcell_scroll[a])
@@ -1029,14 +1029,14 @@ impl Widget for List {
         ctx.set_style(self.layout.style);
 
         let fract = self.scroll.subcell_scroll;
-        let has_subcell = crate::runtime::is_gui() && fract != Vec2::of(0.0);
+        let has_subcell = crate::is_gui() && fract != Vec2::of(0.0);
 
         ctx.move_to(chrome_before);
 
         if has_subcell {
             #[cfg(feature = "gui")]
             {
-                let cell_px = crate::runtime::get_runtime_info().cell_size.unwrap_or(Vec2::of(1));
+                let cell_px = crate::get_runtime_info().cell_size.unwrap_or(Vec2::of(1));
                 let subcell = Axis2D::map(|axis| -((fract[axis] * cell_px[axis] as f32).round() as i32));
                 let mut content_size = viewport;
                 let mut content_offset = Vec2::of(0i32);

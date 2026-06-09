@@ -139,7 +139,7 @@ pub mod config {
                 let win_theme = s.window.as_ref().and_then(|w| w.theme());
                 super::apply_window_theme(win_theme, &cfg);
             });
-            crate::runtime::dirty_paint();
+            crate::dirty_paint();
         }
     }
 
@@ -557,7 +557,7 @@ impl ApplicationHandler for GuiState {
         self.window = Some(window);
         self.backend = Some(backend);
         crate::runtime::sync_gui_grid_size(self.cell_size, self.font_cell_px());
-        crate::runtime::dirty_layout();
+        crate::dirty_layout();
         self.pending_events.push(RuntimeEvent::Focus(true));
     }
 
@@ -575,7 +575,7 @@ impl ApplicationHandler for GuiState {
             WindowEvent::Resized(new_size) => {
                 self.pixel_size = Vec2::new(new_size.width.max(1), new_size.height.max(1));
                 self.relayout();
-                crate::runtime::dirty_paint();
+                crate::dirty_paint();
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 let new_scale = scale_factor.round().max(1.0) as u32;
@@ -589,12 +589,12 @@ impl ApplicationHandler for GuiState {
                 self.focused = f;
                 self.cursor_blink_anchor = std::time::Instant::now();
                 self.pending_events.push(RuntimeEvent::Focus(f));
-                crate::runtime::dirty_paint();
+                crate::dirty_paint();
             }
             #[cfg(feature = "harmonious")]
             WindowEvent::ThemeChanged(t) => {
                 apply_window_theme(Some(t), &config::get());
-                crate::runtime::dirty_paint();
+                crate::dirty_paint();
             }
             WindowEvent::ModifiersChanged(m) => {
                 self.modifiers = winit_modifiers_to_tuie(m.state());
@@ -605,7 +605,7 @@ impl ApplicationHandler for GuiState {
                 if key_event.state == ElementState::Pressed {
                     if let Some(chord) = winit_key_to_chord(&key_event, self.modifiers) {
                         self.cursor_blink_anchor = std::time::Instant::now();
-                        crate::runtime::dirty_paint();
+                        crate::dirty_paint();
                         self.pending_events.push(RuntimeEvent::Input(InputEvent {
                             chord,
                             pos: self.pack_mouse_pos(),
@@ -770,7 +770,7 @@ impl GuiState {
             self.last_cursor_xy = cursor_xy;
         }
         let cursor_xy = if self.focused
-            && crate::runtime::config::get().cursor_blink
+            && crate::config::get().cursor_blink
             && cursor_xy.is_some()
         {
             let elapsed = self.cursor_blink_anchor.elapsed().as_millis() as u64;

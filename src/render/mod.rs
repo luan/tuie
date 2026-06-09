@@ -1262,7 +1262,7 @@ impl<'a> RenderContext<'a> {
         let seq = region.state.next_seq();
         let inherited_clip = region.state.drain_ctx.parent_clip_screen_px;
         let parent_clip_screen_px = match kind {
-            Kind::Layer => crate::runtime::get_runtime_info()
+            Kind::Layer => crate::get_runtime_info()
                 .cell_size
                 .map(|cp| {
                     let off = Vec2::new(parent_pos.x as i32, parent_pos.y as i32)
