@@ -25,14 +25,14 @@ mod tests;
 pub use runtime::{
     config, dirty_layout, dirty_paint,
     disable, emit, enable, ensure_focused, focus_widget, get_focus_chain,
-    get_focused_measure, get_focused_widget, get_terminal_info, focus_next_tab_order, focus_next_directionally,
+    get_focused_measure, get_focused_widget, get_runtime_info, focus_next_tab_order, focus_next_directionally,
     in_focus_chain, is_focused, is_gui,
     on_quit, quit, reveal, schedule, send, set_output, set_spawner, spawn, start_tui,
     spawn_stream, suspend,
 };
 pub use runtime::clipboard;
 #[doc(hidden)]
-pub use render::{terminal_display_width, terminal_grapheme_width};
+pub use render::{display_width, grapheme_width};
 #[doc(hidden)]
 pub use runtime::popup::{close_popup, dismiss_popup, open_popup};
 
@@ -170,7 +170,7 @@ pub mod prelude {
 
     pub use super::runtime::FocusedMeasure;
     pub use super::runtime::TaskHandle;
-    pub use super::runtime::TerminalInfo;
+    pub use super::runtime::RuntimeInfo;
     pub use super::runtime::TuiConfig;
 
     pub use super::render::GridRenderer;

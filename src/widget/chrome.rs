@@ -109,7 +109,7 @@ impl Chrome {
             }
 
             let decorated = format!("{} {} ", separator, title.text.as_str());
-            let decorated_w = tuie::terminal_display_width(&decorated);
+            let decorated_w = tuie::display_width(&decorated);
             let slack = inner_w.saturating_sub(decorated_w);
 
             let x: i32 = 1 + match title.align {

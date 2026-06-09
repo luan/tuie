@@ -99,7 +99,7 @@ impl PlaceholderScanner {
 
         let placement_size = kitty::lookup_placement_size(&source_inner, run.placement_id);
         let img_dims = source_inner.get_pixel_dims();
-        let cell_px = crate::runtime::get_terminal_info()
+        let cell_px = crate::runtime::get_runtime_info()
             .cell_size
             .unwrap_or(Vec2::new(1u16, 1u16));
 

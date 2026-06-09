@@ -344,7 +344,7 @@ impl<'a> RowWriter<'a> {
         } else {
             glyph
         };
-        let wide = terminal_grapheme_width(glyph) > 1;
+        let wide = grapheme_width(glyph) > 1;
         let mut template = GridCell::DEFAULT;
         template.set_glyph(glyph, self.graphemes);
         template.style.apply(style);
@@ -402,7 +402,7 @@ impl<'a> RowWriter<'a> {
             if c == '\n' {
                 break;
             }
-            let w = terminal_grapheme_width(grapheme);
+            let w = grapheme_width(grapheme);
             self.cell(col).grapheme(grapheme);
             col += w;
         }
@@ -456,7 +456,7 @@ impl CellWriter<'_> {
         if s.len() == 1 && s.as_bytes()[0].is_ascii_control() {
             return self.glyph(s.as_bytes()[0] as char);
         }
-        let wide = terminal_grapheme_width(s) > 1;
+        let wide = grapheme_width(s) > 1;
         unsafe { self.grapheme_unchecked(wide, s) }
     }
 
@@ -700,8 +700,8 @@ fn glyph_dirty_cols(glyph: &str, is_wide: bool, current: i32) -> i32 {
     }
 }
 
-/// Returns the terminal cell width of a single grapheme cluster.
-pub fn terminal_grapheme_width(grapheme: &str) -> usize {
+/// Returns the display cell width of a single grapheme cluster.
+pub fn grapheme_width(grapheme: &str) -> usize {
     let bytes = grapheme.as_bytes();
     if bytes.len() == 1 && bytes[0] < 0x80 {
         return if bytes[0] < 0x20 || bytes[0] == 0x7F {
@@ -721,10 +721,10 @@ pub fn terminal_grapheme_width(grapheme: &str) -> usize {
     }
 }
 
-/// Returns the sum of [`terminal_grapheme_width`] for every grapheme in `text`.
-pub fn terminal_display_width(text: &str) -> usize {
+/// Returns the sum of [`grapheme_width`] for every grapheme in `text`.
+pub fn display_width(text: &str) -> usize {
     text.graphemes(true)
-        .fold(0, |acc, grapheme| acc + terminal_grapheme_width(grapheme))
+        .fold(0, |acc, grapheme| acc + grapheme_width(grapheme))
 }
 
 impl GridRendererState {
@@ -1262,7 +1262,7 @@ impl<'a> RenderContext<'a> {
         let seq = region.state.next_seq();
         let inherited_clip = region.state.drain_ctx.parent_clip_screen_px;
         let parent_clip_screen_px = match kind {
-            Kind::Layer => crate::runtime::get_terminal_info()
+            Kind::Layer => crate::runtime::get_runtime_info()
                 .cell_size
                 .map(|cp| {
                     let off = Vec2::new(parent_pos.x as i32, parent_pos.y as i32)
@@ -1445,7 +1445,7 @@ impl<'a> RenderContext<'a> {
             if c == '\n' {
                 break;
             }
-            let w = terminal_grapheme_width(grapheme);
+            let w = grapheme_width(grapheme);
             advance += w as i32;
 
             let (g, w) = if col + w > range.end {

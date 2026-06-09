@@ -358,7 +358,7 @@ fn subcell_event(chord: Chord, pos: Vec2<f32>) -> RuntimeEvent {
 }
 
 fn enable_subcell_events(term: &mut Emulator) {
-    term.update_terminal_info(|info| {
+    term.update_runtime_info(|info| {
         info.cell_size = Some(Vec2::new(10, 20));
         info.subcell_events = true;
     });

@@ -18,9 +18,9 @@ impl Emulator {
         let _ = crate::runtime::update(root, events);
     }
 
-    /// Overrides the emulated [`TerminalInfo`] capabilities, e.g. `cell_size` and `subcell_events`.
-    pub fn update_terminal_info(&mut self, f: impl FnOnce(&mut TerminalInfo)) {
-        crate::runtime::update_terminal_info(f);
+    /// Overrides the emulated [`RuntimeInfo`] capabilities, e.g. `cell_size` and `subcell_events`.
+    pub fn update_runtime_info(&mut self, f: impl FnOnce(&mut RuntimeInfo)) {
+        crate::runtime::update_runtime_info(f);
     }
 
     /// Returns the most recently rendered frame as a [`StyledString`].

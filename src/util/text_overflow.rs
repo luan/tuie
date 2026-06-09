@@ -101,9 +101,9 @@ impl<'a> TextOverflowLineIterator<'a> {
     ) -> Self {
         let truncate_str = config.truncate.unwrap_or("");
         let mut truncated_marker_width =
-            tuie::terminal_display_width(truncate_str);
+            tuie::display_width(truncate_str);
         let mut word_break_marker_width =
-            tuie::terminal_display_width(config.word_break);
+            tuie::display_width(config.word_break);
         if max_size.x <= truncated_marker_width {
             config.truncate = Some("");
             truncated_marker_width = 0;
@@ -339,14 +339,14 @@ impl<'a> TextOverflowLineIterator<'a> {
 
         if total_width > self.max_size.x {
             if self.align == Align::Center && !self.config.wrap {
-                let overflow_columns = tuie::terminal_display_width(line)
+                let overflow_columns = tuie::display_width(line)
                     .saturating_sub(self.max_size.x) / 2;
                 let mut skipped_width = 0usize;
                 let mut skip_end = 0usize;
                 let mut shown_width = 0usize;
                 let mut shown_end = line.len();
                 for (i, g) in line.grapheme_indices(true) {
-                    let grapheme_width = tuie::terminal_grapheme_width(g);
+                    let grapheme_width = tuie::grapheme_width(g);
                     if skipped_width < overflow_columns {
                         skipped_width += grapheme_width;
                         skip_end = i + g.len();
@@ -416,7 +416,7 @@ impl<'a> TextOverflowLineIterator<'a> {
             let mut trailing_whitespace = false;
             if self.config.trim {
                 trimmed_line = partial_line.trim_end();
-                width -= tuie::terminal_display_width(
+                width -= tuie::display_width(
                     &partial_line[trimmed_line.len()..],
                 );
                 trimmed_remaining = remaining.trim_start();
@@ -425,7 +425,7 @@ impl<'a> TextOverflowLineIterator<'a> {
                 if trimmed_line.is_empty() {
                     trimmed_line = partial_line;
                 } else {
-                    width -= tuie::terminal_display_width(
+                    width -= tuie::display_width(
                         &partial_line[trimmed_line.len()..],
                     );
                     let mut trimmed_len =
@@ -608,7 +608,7 @@ impl TextOverflow {
                 return tabstop - (col % tabstop);
             }
         }
-        tuie::terminal_grapheme_width(grapheme)
+        tuie::grapheme_width(grapheme)
     }
 
     /// Returns an iterator over the visual lines of `text` bounded by `max_size` cells.

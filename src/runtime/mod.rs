@@ -134,23 +134,23 @@ crate::config_module!(TuiConfig {
     always_selected: false,
 });
 
-/// Terminal capabilities and dimensions.
+/// Host capabilities and dimensions.
 #[derive(Clone)]
 #[non_exhaustive]
-pub struct TerminalInfo {
-    /// The terminal size in cells.
+pub struct RuntimeInfo {
+    /// The surface size in cells.
     pub size: Vec2<u16>,
-    /// The pixel size of a single cell, when reported by the terminal.
+    /// The pixel size of a single cell, when reported by the host.
     pub cell_size: Option<Vec2<u16>>,
     /// Whether [`InputEvent::pos`](crate::widget::input::InputEvent::pos) carries real sub-cell precision.
     pub subcell_events: bool,
-    /// The detected color scheme, when reported by the terminal.
+    /// The detected color scheme, when reported by the host.
     pub color_scheme: Option<ColorScheme>,
     /// The raw `XTVERSION` response, if the terminal replied.
     pub xtversion: Option<String>,
 }
 
-impl Default for TerminalInfo {
+impl Default for RuntimeInfo {
     fn default() -> Self {
         Self {
             size: Vec2::of(0u16),
@@ -269,7 +269,7 @@ struct RuntimeContext {
     focus_request: Option<WidgetId>,
     navigate_request: Option<NavigateOp>,
     focus_chain: Vec<WidgetId>,
-    terminal_info: Option<TerminalInfo>,
+    runtime_info: Option<RuntimeInfo>,
     image_caps: ImageCaps,
     pending_cell_px: Option<Vec2<u16>>,
 }
@@ -291,7 +291,7 @@ impl RuntimeContext {
             focus_request: None,
             navigate_request: None,
             focus_chain: Vec::new(),
-            terminal_info: None,
+            runtime_info: None,
             image_caps: ImageCaps::default(),
             pending_cell_px: None,
         }
@@ -376,10 +376,10 @@ pub fn is_gui() -> bool {
     with_ctx(|c| c.mode == Mode::Gui)
 }
 
-/// Returns the current [`TerminalInfo`]. Before startup completes, returns the [`Default`]
+/// Returns the current [`RuntimeInfo`]. Before startup completes, returns the [`Default`]
 /// (`size: 0`, `cell_size: None`, etc.) rather than panicking.
-pub fn get_terminal_info() -> TerminalInfo {
-    with_ctx(|ctx| ctx.terminal_info.clone().unwrap_or_default())
+pub fn get_runtime_info() -> RuntimeInfo {
+    with_ctx(|ctx| ctx.runtime_info.clone().unwrap_or_default())
 }
 
 #[cfg(feature = "images")]
@@ -387,9 +387,9 @@ pub(crate) fn get_image_caps() -> ImageCaps {
     with_ctx(|ctx| ctx.image_caps)
 }
 
-pub(crate) fn update_terminal_info(f: impl FnOnce(&mut TerminalInfo)) {
+pub(crate) fn update_runtime_info(f: impl FnOnce(&mut RuntimeInfo)) {
     with_ctx_mut(|ctx| {
-        if let Some(info) = ctx.terminal_info.as_mut() {
+        if let Some(info) = ctx.runtime_info.as_mut() {
             f(info);
         }
     });
@@ -399,7 +399,7 @@ pub(crate) fn update_terminal_info(f: impl FnOnce(&mut TerminalInfo)) {
 pub(crate) fn sync_gui_grid_size(cells: Vec2<u16>, cell_px: Vec2<u16>) {
     with_ctx_mut(|ctx| {
         ctx.pending_cell_px = Some(cell_px);
-        if let Some(info) = ctx.terminal_info.as_mut() {
+        if let Some(info) = ctx.runtime_info.as_mut() {
             info.size = cells;
             info.cell_size = Some(cell_px);
         }
@@ -873,7 +873,7 @@ pub(crate) fn update(
                     if let Some(px) = cell_px {
                         ctx.pending_cell_px = Some(px);
                     }
-                    if let Some(info) = ctx.terminal_info.as_mut() {
+                    if let Some(info) = ctx.runtime_info.as_mut() {
                         info.size = *size;
                         if let Some(new_physical) = cell_px {
                             info.cell_size = Some(new_physical);
@@ -1039,7 +1039,7 @@ pub(crate) fn init_emulator(size: Vec2<u16>) {
     });
     set_output(std::io::sink());
     with_ctx_mut(|ctx| {
-        ctx.terminal_info = Some(TerminalInfo { size, ..Default::default() });
+        ctx.runtime_info = Some(RuntimeInfo { size, ..Default::default() });
         ctx.image_caps = ImageCaps::default();
     });
 }
@@ -1286,7 +1286,7 @@ impl Runtime {
         let (cell_size, cell_px) = with_gui_state(|s| (s.cell_size, s.font_cell_px()));
         with_ctx_mut(|ctx| {
             ctx.pending_cell_px = Some(cell_px);
-            ctx.terminal_info = Some(TerminalInfo {
+            ctx.runtime_info = Some(RuntimeInfo {
                 size: cell_size,
                 cell_size: Some(cell_px),
                 subcell_events: true,
@@ -1317,7 +1317,7 @@ impl Runtime {
                 let color_handles = crate::theme::harmonious::add_color_queries(&mut batch);
 
                 let physical = physical_cell_px();
-                let mut info = TerminalInfo {
+                let mut info = RuntimeInfo {
                     size: initial_size,
                     cell_size: physical,
                     ..Default::default()
@@ -1378,7 +1378,7 @@ impl Runtime {
 
                 with_ctx_mut(|ctx| {
                     ctx.pending_cell_px = info.cell_size;
-                    ctx.terminal_info = Some(info);
+                    ctx.runtime_info = Some(info);
                     ctx.image_caps = caps;
                 });
             }
@@ -1390,7 +1390,7 @@ impl Runtime {
             let _ = signals::install(waker_write());
         } else {
             with_ctx_mut(|ctx| {
-                if let Some(info) = ctx.terminal_info.as_mut() {
+                if let Some(info) = ctx.runtime_info.as_mut() {
                     info.size = initial_size;
                 }
             });
@@ -1406,7 +1406,7 @@ impl Runtime {
         }
         output::enable_sgr_mouse(&mut self.buf);
         let pixel_mouse = with_ctx(|ctx| {
-            ctx.terminal_info
+            ctx.runtime_info
                 .as_ref()
                 .map(|i| i.subcell_events)
                 .unwrap_or(false)
@@ -1465,7 +1465,7 @@ impl Runtime {
         output::leave_alternate_screen(&mut self.buf);
         output::pop_keyboard_enhancement_flags(&mut self.buf);
         let pixel_mouse = RUNTIME_CTX
-            .try_with(|ctx| ctx.borrow().terminal_info.as_ref().map(|i| i.subcell_events).unwrap_or(false))
+            .try_with(|ctx| ctx.borrow().runtime_info.as_ref().map(|i| i.subcell_events).unwrap_or(false))
             .unwrap_or(false);
         if pixel_mouse {
             output::disable_mouse_pixel_capture(&mut self.buf);
@@ -1757,7 +1757,7 @@ impl Runtime {
     }
 
     fn focus_first_widget(&mut self, root: &mut dyn Widget) {
-        let terminal_size = get_terminal_info().size;
+        let terminal_size = get_runtime_info().size;
         let clip = Axis2D::map(|a| (0, terminal_size[a] as i32));
 
         let mut id = {
@@ -1970,7 +1970,7 @@ impl Runtime {
                 }
             }
             RuntimeEvent::ColorSchemeChange(scheme) => {
-                update_terminal_info(|info| info.color_scheme = Some(scheme));
+                update_runtime_info(|info| info.color_scheme = Some(scheme));
                 #[cfg(feature = "harmonious")]
                 {
                     match crate::theme::harmonious::query_palette() {
@@ -2379,7 +2379,7 @@ impl Runtime {
     }
 
     fn layout_and_render(&mut self, root: &mut dyn Widget) -> std::io::Result<FrameRender> {
-        let terminal_size = get_terminal_info().size;
+        let terminal_size = get_runtime_info().size;
         if terminal_size != root.get_rect_size() {
             dirty_layout();
         }
@@ -2538,7 +2538,7 @@ impl Runtime {
         })
         .unwrap_or((Vec2::of(0i32), Vec2::of(0u32)));
         self.renderer.set_root_screen_pos_px(grid_origin_px);
-        if let Some(cell_px) = get_terminal_info().cell_size {
+        if let Some(cell_px) = get_runtime_info().cell_size {
             let size = self.renderer.gui_size();
             let grid_size_px = Vec2::new(
                 size.x as u32 * cell_px.x as u32,
@@ -2582,7 +2582,7 @@ impl Runtime {
         output::end_synchronized_update(&mut self.buf);
 
         let mut cursor_visible = false;
-        let term_size = get_terminal_info().size;
+        let term_size = get_runtime_info().size;
         let in_grid = |pos: Vec2<i32>| {
             pos.x >= 0
                 && pos.y >= 0

@@ -24,7 +24,7 @@ impl<'a> TabIterator<'a> {
         if let Some(tabstop) = tabstop {
             let mut iter = text.split('\t');
             let content = iter.next().unwrap();
-            let width = tuie::terminal_display_width(content) as u64;
+            let width = tuie::display_width(content) as u64;
             Self {
                 col: col.wrapping_add(width as u8),
                 tabstop,
@@ -38,7 +38,7 @@ impl<'a> TabIterator<'a> {
                 iter: Some(iter),
             }
         } else {
-            let width = tuie::terminal_display_width(text) as u64;
+            let width = tuie::display_width(text) as u64;
             Self {
                 col: col.wrapping_add(width as u8),
                 tabstop: 0,
@@ -63,7 +63,7 @@ impl<'a> Iterator for TabIterator<'a> {
         };
         let upcoming = iter.next().map(|content| {
             let tab_size = self.tabstop - self.col % self.tabstop;
-            let width = tuie::terminal_display_width(content) as u64;
+            let width = tuie::display_width(content) as u64;
             self.col = self.col
                 .wrapping_add(width as u8)
                 .wrapping_add(tab_size);
@@ -430,7 +430,7 @@ impl Text {
                         if offset > index {
                             break;
                         }
-                        w += tuie::terminal_grapheme_width(grapheme);
+                        w += tuie::grapheme_width(grapheme);
                     }
                     break;
                 }
@@ -496,7 +496,7 @@ impl Text {
                     } else {
                         for grapheme in part.content.graphemes(true) {
                             let width =
-                                tuie::terminal_grapheme_width(grapheme) as i32;
+                                tuie::grapheme_width(grapheme) as i32;
                             remaining -= width;
                             if remaining < 0 {
                                 return offset;
