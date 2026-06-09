@@ -7,6 +7,10 @@ use crate::editor::char_class::{CharClass, GetCharClass};
 pub trait TextBuffer {
     /// Returns the total length in bytes.
     fn len(&self) -> usize;
+    /// Returns whether the buffer is empty.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     /// Returns whether `index` is a `char` boundary.
     fn is_char_boundary(&self, index: usize) -> bool;
     /// Returns the substring `range` as a new [`String`].
