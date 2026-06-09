@@ -927,7 +927,7 @@ impl Pane {
         let physical_start = child_ctx.pos[a] as i32;
         let physical_end = physical_start + child_ctx.physical_size[a] as i32;
         let anchor = child_ctx.anchor;
-        let monotonic = !self.wrap.is_some();
+        let monotonic = self.wrap.is_none();
         for child in self.children.iter() {
             let child_pos = child.get_pos();
             let slot_size_a = child.get_rect_size()[a] as i32;
@@ -1144,7 +1144,6 @@ impl Widget for Pane {
                 ctx.region(viewport)
             };
             self.render_children(&mut child_ctx);
-            drop(child_ctx);
         }
 
         if let Some(sc) = &self.scroll {
@@ -1224,7 +1223,7 @@ impl Widget for Pane {
     ) -> Option<WidgetId> {
         for child in self.children.iter() {
             let grandchild = child
-                .find_descendant(predicate, path.as_mut().map(|p| &mut **p));
+                .find_descendant(predicate, path.as_deref_mut());
             if grandchild.is_some() {
                 if let Some(p) = &mut path {
                     p.push(child.get_id());
@@ -1487,7 +1486,7 @@ impl Widget for Pane {
             if Self::child_contains(&**child, pos) {
                 let descendant = child.descendant_at_pos(
                     pos,
-                    path.as_mut().map(|p| &mut **p),
+                    path.as_deref_mut(),
                 );
                 if let Some(r) = descendant {
                     if let Some(p) = &mut path {
@@ -1531,7 +1530,7 @@ impl Widget for Pane {
                 let grandchild = child.find_descendant_at_pos(
                     pos,
                     predicate,
-                    path.as_mut().map(|p| &mut **p),
+                    path.as_deref_mut(),
                 );
                 if grandchild.is_some() {
                     if let Some(p) = &mut path {

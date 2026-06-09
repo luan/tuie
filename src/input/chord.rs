@@ -129,7 +129,7 @@ fn parse_key_name(name: &str) -> Option<Key> {
     }
     let mut chars = name.chars();
     let first = chars.next()?;
-    if first.to_ascii_lowercase() == 'f' {
+    if first.eq_ignore_ascii_case(&'f') {
         if let Ok(n) = name[1..].parse::<u8>() {
             if (1..=12).contains(&n) {
                 return Some(Key::F(n));

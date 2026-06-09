@@ -51,7 +51,7 @@ impl<T: TextDocument + 'static> InputBindings<T> for EmacsBindings<T> {
             chord!(Alt + d) => state.delete_word(text, Sign::Positive),
             chord!(Ctrl + h) => state.delete_char(text, Sign::Negative),
             _ => {
-                if !on_input_shared(state, text, &event) {
+                if !on_input_shared(state, text, event) {
                     return InputResult::Rejected;
                 }
             }

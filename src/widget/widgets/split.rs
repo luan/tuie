@@ -11,7 +11,7 @@ use std::cell::{Cell, RefCell};
 type BaseSize = fn(&Layout) -> Vec2<u16>;
 
 thread_local! {
-    static EDGE_POOL: RefCell<Vec<Vec<CrossEdge>>> = RefCell::new(Vec::new());
+    static EDGE_POOL: RefCell<Vec<Vec<CrossEdge>>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Leaf pane inside a [`Split`] holding a single widget.
@@ -836,7 +836,7 @@ impl SplitChild {
             let mut weight_sum: u32 = 0;
 
             for (i, c) in children.iter().enumerate() {
-                let already = deltas[i].abs() as u16;
+                let already = deltas[i].unsigned_abs() as u16;
                 let room = room_of(c, already);
                 let flex = c.effective_flex();
                 let w: u32 = if room == 0 {
@@ -949,7 +949,7 @@ impl SplitChild {
 
     /// Grows the pane below `divider_idx` by shrinking a pane above it.
     fn grow_at_divider(
-        children: &mut Vec<SplitChild>,
+        children: &mut [SplitChild],
         divider_idx: usize,
         axis: Axis2D,
         needed: u16,
@@ -979,7 +979,7 @@ impl SplitChild {
 
     /// Grows the pane above `divider_idx` by shrinking a pane below it.
     fn shrink_at_divider(
-        children: &mut Vec<SplitChild>,
+        children: &mut [SplitChild],
         divider_idx: usize,
         axis: Axis2D,
         needed: u16,
@@ -1038,7 +1038,7 @@ impl SplitChild {
     }
 
     fn move_divider(
-        children: &mut Vec<SplitChild>,
+        children: &mut [SplitChild],
         divider_idx: usize,
         axis: Axis2D,
         change: i32,
@@ -1298,11 +1298,11 @@ impl SplitNode {
             cuts: Vec<i32>,
         }
         thread_local! {
-            static DIVIDER_BUFS: RefCell<DividerBufs> = RefCell::new(DividerBufs {
+            static DIVIDER_BUFS: RefCell<DividerBufs> = const { RefCell::new(DividerBufs {
                 child_edges: Vec::new(),
                 next_edges: Vec::new(),
                 cuts: Vec::new(),
-            });
+            }) };
         }
 
         let SplitNode::Container {
@@ -1620,7 +1620,7 @@ impl SplitNode {
                 }) {
                     if let Some(r) = w.descendant_at_pos(
                         pos,
-                        path.as_mut().map(|p| &mut **p),
+                        path.as_deref_mut(),
                     ) {
                         if let Some(p) = &mut path {
                             p.push(w.get_id());
@@ -1649,7 +1649,7 @@ impl SplitNode {
                         pos,
                         child_offset,
                         gap,
-                        path.as_mut().map(|p| &mut **p),
+                        path.as_deref_mut(),
                     ) {
                         return Some(r);
                     }
@@ -1684,7 +1684,7 @@ impl SplitNode {
                     let grandchild = w.find_descendant_at_pos(
                         pos,
                         predicate,
-                        path.as_mut().map(|p| &mut **p),
+                        path.as_deref_mut(),
                     );
                     if grandchild.is_some() {
                         if let Some(p) = &mut path {
@@ -1717,7 +1717,7 @@ impl SplitNode {
                         predicate,
                         child_offset,
                         gap,
-                        path.as_mut().map(|p| &mut **p),
+                        path.as_deref_mut(),
                     ) {
                         return Some(r);
                     }
@@ -2424,19 +2424,19 @@ impl Split {
         if has_border {
             self.top_edges.clear();
             self.root.node.collect_edge_styles(
-                Axis2D::X, false, inner_offset.x as i32, self.gap, &mut self.top_edges,
+                Axis2D::X, false, inner_offset.x, self.gap, &mut self.top_edges,
             );
             self.bottom_edges.clear();
             self.root.node.collect_edge_styles(
-                Axis2D::X, true, inner_offset.x as i32, self.gap, &mut self.bottom_edges,
+                Axis2D::X, true, inner_offset.x, self.gap, &mut self.bottom_edges,
             );
             self.left_edges.clear();
             self.root.node.collect_edge_styles(
-                Axis2D::Y, false, inner_offset.y as i32, self.gap, &mut self.left_edges,
+                Axis2D::Y, false, inner_offset.y, self.gap, &mut self.left_edges,
             );
             self.right_edges.clear();
             self.root.node.collect_edge_styles(
-                Axis2D::Y, true, inner_offset.y as i32, self.gap, &mut self.right_edges,
+                Axis2D::Y, true, inner_offset.y, self.gap, &mut self.right_edges,
             );
 
             for edges in [&mut self.top_edges, &mut self.bottom_edges] {
@@ -2727,7 +2727,7 @@ impl Widget for Split {
     ) -> Option<WidgetId> {
         self.root.node.find_leaf(&mut |w| {
             let grandchild =
-                w.find_descendant(predicate, path.as_mut().map(|p| &mut **p));
+                w.find_descendant(predicate, path.as_deref_mut());
             if grandchild.is_some() {
                 if let Some(p) = &mut path {
                     p.push(w.get_id());
@@ -2747,14 +2747,14 @@ impl Widget for Split {
     fn descendant_at_pos(
         &self,
         pos: Vec2<f32>,
-        mut path: Option<&mut Vec<WidgetId>>,
+        path: Option<&mut Vec<WidgetId>>,
     ) -> Option<WidgetId> {
         let abs_offset = self.inner_content_pos();
         self.root.node.find_descendant_at_pos(
             pos,
             abs_offset,
             self.gap,
-            path.as_mut().map(|p| &mut **p),
+            path,
         )
     }
 
@@ -2762,7 +2762,7 @@ impl Widget for Split {
         &self,
         pos: Vec2<f32>,
         predicate: &dyn Fn(&dyn Widget) -> bool,
-        mut path: Option<&mut Vec<WidgetId>>,
+        path: Option<&mut Vec<WidgetId>>,
     ) -> Option<WidgetId> {
         let abs_offset = self.inner_content_pos();
         self.root.node.find_matching_descendant_at_pos(
@@ -2770,7 +2770,7 @@ impl Widget for Split {
             predicate,
             abs_offset,
             self.gap,
-            path.as_mut().map(|p| &mut **p),
+            path,
         )
     }
 
@@ -2796,7 +2796,7 @@ impl Widget for Split {
         match &event.chord {
             chord!(LeftClick) => {
                 let mouse = event.cell();
-                let mouse_vec = Vec2::new(mouse.x as i32, mouse.y as i32);
+                let mouse_vec = Vec2::new(mouse.x, mouse.y);
 
                 let inner_offset = self.inner_offset();
 
@@ -2859,7 +2859,7 @@ impl Widget for Split {
                         ) else {
                             continue;
                         };
-                        let delta = event.cell()[a] as i32
+                        let delta = event.cell()[a]
                             - div_pos
                             - dd.grab_offset;
                         if delta != 0 {

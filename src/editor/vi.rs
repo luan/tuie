@@ -166,14 +166,14 @@ struct SharedViState {
 }
 
 thread_local! {
-    static SHARED_VI_STATE: RefCell<SharedViState> = RefCell::new(SharedViState {
+    static SHARED_VI_STATE: RefCell<SharedViState> = const { RefCell::new(SharedViState {
         last_command: Vec::new(),
         last_insert: Vec::new(),
         last_visual: None,
         last_find: None,
         insert_entry_pos: None,
         replaying: false,
-    });
+    }) };
 }
 
 /// Cursor shape used for each [`ViMode`].
@@ -973,7 +973,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                     }
                     backslash_count += 1;
                 }
-                if backslash_count % 2 == 0 {
+                if backslash_count.is_multiple_of(2) {
                     quote_positions.push(c.clone());
                 }
             }
@@ -1690,7 +1690,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             if seg_has_content {
                 for chunk in text.chunks(seg_start..trim_end.get_index())
                 {
-                    result.push_str(&chunk);
+                    result.push_str(chunk);
                 }
             }
 
@@ -1836,21 +1836,19 @@ impl<T: TextDocument + 'static> ViBindings<T> {
         let start = state.cursor.clone();
         let mut c = state.cursor.clone();
         loop {
-            if sign.is_positive() {
-                if c.get_char(text) == '\0' || c.get_char(text).get_class() == CharClass::Whitespace
+            if sign.is_positive()
+                && (c.get_char(text) == '\0' || c.get_char(text).get_class() == CharClass::Whitespace)
                 {
                     break;
                 }
-            }
             if c.clone() == *c.move_grapheme(text, sign) {
                 break;
             }
-            if sign.is_negative() {
-                if c.get_char(text).get_class() == CharClass::Whitespace {
+            if sign.is_negative()
+                && c.get_char(text).get_class() == CharClass::Whitespace {
                     c.next_grapheme(text);
                     break;
                 }
-            }
         }
         state.cursor = c;
         state.cursor != start
@@ -2665,7 +2663,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                 return true;
             }
             chord!(g)
-                if queue.peek().map_or(false, |e| {
+                if queue.peek().is_some_and(|e| {
                     matches!(e.chord, chord!(u) | chord!(U))
                 }) =>
             {
@@ -2678,7 +2676,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                 return self.parse_operator(state, text, op, count, queue);
             }
             chord!(g)
-                if queue.peek().map_or(false, |e| matches!(e.chord, chord!(i))) =>
+                if queue.peek().is_some_and(|e| matches!(e.chord, chord!(i))) =>
             {
                 let _ = queue.next();
                 self.action_resume_insert(state, text);
@@ -2710,7 +2708,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             _ => {}
         }
 
-        match self.resolve_motion(state, text, &event, count, queue) {
+        match self.resolve_motion(state, text, event, count, queue) {
             Some(Ok((_, affinity))) => {
                 self.clamp_cursor_to_line_end(state, text);
                 state.anchor = state.cursor.clone();
@@ -2720,8 +2718,8 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             None => return false,
             Some(Err(())) => {}
         }
-        if Self::is_mouse_click_or_drag(&event) {
-            return self.handle_normal_mouse(state, text, &event);
+        if Self::is_mouse_click_or_drag(event) {
+            return self.handle_normal_mouse(state, text, event);
         }
         match &event.chord {
             chord!(D) => self.operator_to_eol(state, text, ViOperator::Delete),
@@ -2742,7 +2740,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             chord!(R) => self.set_mode(state, ViMode::Replace),
             chord!(v) => self.set_mode(state, ViMode::Visual),
             chord!(V) => self.set_mode(state, ViMode::VisualLine),
-            chord!(';') | chord!(',') => self.action_find_repeat(state, text, &event, count),
+            chord!(';') | chord!(',') => self.action_find_repeat(state, text, event, count),
             chord!(p) => self.paste_at(state, text, Sign::Positive),
             chord!(P) => self.paste_at(state, text, Sign::Negative),
             chord!(Backspace) => self.action_cursor_advance(state, text, Sign::Negative),
@@ -2862,7 +2860,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             let on_word = state
                 .cursor
                 .get_char_class_at(text, Sign::Positive)
-                .map_or(false, |c| c != CharClass::Whitespace);
+                .is_some_and(|c| c != CharClass::Whitespace);
             if on_word {
                 let saved = state.cursor.clone();
                 let big = matches!(event.chord, chord!(W));
@@ -2882,7 +2880,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
         }
 
         let start = state.cursor.clone();
-        match self.resolve_motion(state, text, &event, count, queue) {
+        match self.resolve_motion(state, text, event, count, queue) {
             Some(Ok((mt, _))) => {
                 if matches!(mt, Inclusivity::Inclusive) {
                     state.cursor.next_grapheme(text);
@@ -3194,14 +3192,14 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             | chord!('<')
             | chord!(u)
             | chord!(U) => {
-                let op = self.visual_op(&event);
+                let op = self.visual_op(event);
                 let op_linewise =
                     linewise || matches!(op, ViOperator::Indent(_));
                 self.visual_selection_op(state, text, op, op_linewise);
                 true
             }
             chord!(p) => { self.visual_action_paste(state, text); true }
-            chord!(LeftClick) if click == 1 => { self.visual_action_click(state, text, &event); true }
+            chord!(LeftClick) if click == 1 => { self.visual_action_click(state, text, event); true }
             chord!(LeftClick) if click == 2 => { state.double_click(text, event.cell()); true }
             chord!(LeftClick) if click == 3 => {
                 self.set_mode(state, ViMode::VisualLine);
@@ -3210,7 +3208,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             }
             chord!(LeftDrag) if click == 1 => { state.drag(text, event.cell()); true }
             chord!(LeftDrag) if click == 2 => { state.double_click_drag(text, event.cell()); true }
-            chord!(LeftDrag) if click == 3 => { self.triple_click_drag_visual_line(state, text, &event); true }
+            chord!(LeftDrag) if click == 3 => { self.triple_click_drag_visual_line(state, text, event); true }
             _ => false,
         };
         if action_taken {
@@ -3244,7 +3242,7 @@ impl<T: TextDocument + 'static> ViBindings<T> {
             _ => {}
         }
 
-        let handled = match self.resolve_motion(state, text, &event, count, queue) {
+        let handled = match self.resolve_motion(state, text, event, count, queue) {
             Some(Ok((mt, _))) => Some(mt),
             None => {
                 state.anchor = old_anchor;
@@ -3487,15 +3485,15 @@ impl<T: TextDocument + 'static> ViBindings<T> {
                 state.seal_undo_group();
                 match self.mode {
                     ViMode::Normal | ViMode::Operator => {
-                        self.paste_str_at(state, text, &paste, Sign::Positive);
+                        self.paste_str_at(state, text, paste, Sign::Positive);
                     }
                     ViMode::Insert | ViMode::Replace => {
                         self.record_insert_key(event);
-                        state.insert_str(text, &paste);
+                        state.insert_str(text, paste);
                     }
                     ViMode::Visual | ViMode::VisualLine => {
                         state.delete_selection(text);
-                        state.insert_str(text, &paste);
+                        state.insert_str(text, paste);
                     }
                 }
                 return true;
@@ -3576,9 +3574,9 @@ impl<T: TextDocument + 'static> ViBindings<T> {
 
                 let Some(event) = queue.next() else { return false; };
                 if self.mode == ViMode::Insert {
-                    self.on_input_insert_mode(state, text, &event)
+                    self.on_input_insert_mode(state, text, event)
                 } else {
-                    self.on_input_replace_mode(state, text, &event)
+                    self.on_input_replace_mode(state, text, event)
                 }
             }
         }

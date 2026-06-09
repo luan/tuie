@@ -632,8 +632,8 @@ impl List {
                     offset: self.anchor.offset + anchor_height + gap,
                 };
             }
-        } else if self.anchor.offset >= viewport {
-            if self.anchor.index > 0 {
+        } else if self.anchor.offset >= viewport
+            && self.anchor.index > 0 {
                 let prev = self.anchor.index - 1;
                 if let Some(prev_wi) = self.data_to_window(prev) {
                     let prev_height = self.item_height(prev_wi) as i32;
@@ -643,7 +643,6 @@ impl List {
                     };
                 }
             }
-        }
     }
 
     fn clamp_anchor(&mut self, viewport: i32) {
@@ -696,7 +695,7 @@ impl List {
     fn compute_render_range(&self, anchor_idx: usize, viewport: i32) -> std::ops::Range<usize> {
         let margin = viewport as usize * 3;
         let render_start = (anchor_idx.saturating_sub(margin) / Self::CHUNK) * Self::CHUNK;
-        let render_end = ((anchor_idx + margin + 1 + Self::CHUNK - 1) / Self::CHUNK * Self::CHUNK).min(self.len);
+        let render_end = ((anchor_idx + margin + 1).div_ceil(Self::CHUNK) * Self::CHUNK).min(self.len);
 
         let old_start = self.window_start;
         let old_end = old_start + self.items.len();
@@ -746,7 +745,7 @@ impl List {
             let reusable = old_slot < self.reuse_buf.len()
                 && !self.reuse_buf[old_slot]
                     .as_ref()
-                    .map_or(true, |item| item.dirty);
+                    .is_none_or(|item| item.dirty);
 
             let item = if reusable {
                 self.reuse_buf[old_slot].take().unwrap()
@@ -1061,7 +1060,6 @@ impl Widget for List {
         } else {
             let mut vp_ctx = ctx.viewport(viewport);
             self.render_items(&mut vp_ctx, Vec2::of(0i32));
-            drop(vp_ctx);
         }
         let thumb = self.scroll.style.get_resolved_thumb();
         let (extend, _) = thumb.corner_extension(self.scrollbars_both_visible());
@@ -1286,7 +1284,7 @@ impl Widget for List {
     ) -> Option<WidgetId> {
         for item in &self.items {
             let grandchild = item.widget
-                .find_descendant(predicate, path.as_mut().map(|p| &mut **p));
+                .find_descendant(predicate, path.as_deref_mut());
             if grandchild.is_some() {
                 if let Some(p) = &mut path {
                     p.push(item.widget.get_id());
@@ -1414,7 +1412,7 @@ impl Widget for List {
             }
             if let Some(r) = item.widget.descendant_at_pos(
                 pos,
-                path.as_mut().map(|p| &mut **p),
+                path.as_deref_mut(),
             ) {
                 if let Some(p) = &mut path {
                     p.push(item.widget.get_id());
@@ -1446,7 +1444,7 @@ impl Widget for List {
             let grandchild = item.widget.find_descendant_at_pos(
                 pos,
                 predicate,
-                path.as_mut().map(|p| &mut **p),
+                path.as_deref_mut(),
             );
             if grandchild.is_some() {
                 if let Some(p) = &mut path {

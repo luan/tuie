@@ -918,7 +918,7 @@ mod double {
     pub(super) fn corner(g: &mut Glyph, opens: u32) {
         let stroke = g.stroke_thickness(Stroke::Light);
         let trail = stroke / 2;
-        let lead = (stroke + 1) / 2;
+        let lead = stroke.div_ceil(2);
         let cx = g.size.x / 2;
         let cy = g.size.y / 2;
         let max_x = g.size.x.saturating_sub(1);
@@ -981,7 +981,7 @@ mod eighths {
     pub(super) fn boundary(total: u32, index: u32, count: u32) -> u32 {
         let count = count.max(1);
         let extra = total % count;
-        let thick_lo = count / 2 - (extra + 1) / 2;
+        let thick_lo = count / 2 - extra.div_ceil(2);
         let added = index.saturating_sub(thick_lo).min(extra);
         index * (total / count) + added
     }

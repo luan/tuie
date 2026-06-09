@@ -56,7 +56,7 @@ pub(crate) fn hit_test_z(
                     (child.get_id(), z)
                 }
             };
-            if best.as_ref().map_or(true, |(_, b_z, _)| leaf_z > *b_z) {
+            if best.as_ref().is_none_or(|(_, b_z, _)| leaf_z > *b_z) {
                 best = Some((leaf_id, leaf_z, sub_path));
             }
         },
@@ -81,7 +81,7 @@ pub(crate) fn path_subcell_offset(
     for &next_id in &path[1..] {
         let Some(c) = current.get_child(next_id) else { break };
         current = c;
-        total = total + current.get_subcell_offset();
+        total += current.get_subcell_offset();
     }
     let cp = cell_px();
     Axis2D::map(|a| (total[a] * cp[a] as f32).round() as i32)
@@ -98,7 +98,7 @@ pub(crate) fn window_to_leaf(
     let mut pos = window_pos;
     let mut current: &dyn Widget = root;
     for &next_id in &path[1..] {
-        pos = pos - current.get_subcell_offset();
+        pos -= current.get_subcell_offset();
         let Some(c) = current.get_child(next_id) else { break };
         current = c;
     }
@@ -394,7 +394,7 @@ pub(crate) fn find_focusable_2d(
         &root_rect,
     );
 
-    state.found.then(|| state.path)
+    state.found.then_some(state.path)
 }
 
 fn ranges_overlap(
@@ -437,7 +437,7 @@ fn find_focusable_2d_recurse(
             out_path.push(child.get_id());
 
             let (child_shared, child_focus_chain) =
-                if focus_chain.first().map_or(false, |&head| child.get_id() == head) {
+                if focus_chain.first().is_some_and(|&head| child.get_id() == head) {
                     (shared_depth + 1, &focus_chain[1..])
                 } else {
                     (shared_depth, &[][..])
@@ -449,7 +449,7 @@ fn find_focusable_2d_recurse(
                 let child_size = outer.size;
 
                 let is_selected =
-                    focus_chain.last().map_or(false, |&sel| child.get_id() == sel);
+                    focus_chain.last().is_some_and(|&sel| child.get_id() == sel);
 
                 let sel_end = selected_rect.pos[axis] + selected_rect.size[axis] as i32;
                 let child_end = child_pos[axis] + child_size[axis] as i32;

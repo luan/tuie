@@ -2270,11 +2270,11 @@ fn resolve_cached_path(widget: &dyn Widget, id: WidgetId) -> Option<WidgetPath> 
     }
 }
 
-fn find_cached<'a>(widget: &'a dyn Widget, id: WidgetId) -> Option<&'a dyn Widget> {
+fn find_cached(widget: &dyn Widget, id: WidgetId) -> Option<&dyn Widget> {
     resolve_cached_path(widget, id)?.get(widget)
 }
 
-fn find_cached_mut<'a>(widget: &'a mut dyn Widget, id: WidgetId) -> Option<&'a mut dyn Widget> {
+fn find_cached_mut(widget: &mut dyn Widget, id: WidgetId) -> Option<&mut dyn Widget> {
     let path = resolve_cached_path(widget, id)?;
     walk_path_mut(widget, path.as_slice())
 }

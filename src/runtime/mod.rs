@@ -670,7 +670,7 @@ thread_local! {
 
 #[cfg(feature = "gui")]
 thread_local! {
-    static GUI: RefCell<Option<crate::gui::Gui>> = RefCell::new(None);
+    static GUI: RefCell<Option<crate::gui::Gui>> = const { RefCell::new(None) };
 }
 
 fn with_runtime_mut<R>(f: impl FnOnce(&mut Runtime) -> R) -> R {
@@ -721,7 +721,7 @@ fn make_queue(events: &[InputEvent], flushing: bool, unhandled: bool) -> InputQu
 fn dispatch_input(target: &mut dyn Widget, key_queue: &mut [InputEvent], flushing: bool, unhandled: bool) -> (InputResult, usize) {
     let content_pos = target.get_pos().map(|v| v as f32);
     for event in key_queue.iter_mut() {
-        event.pos = event.pos - content_pos;
+        event.pos -= content_pos;
     }
     let mut queue = make_queue(key_queue, flushing, unhandled);
     let result = target.on_input(&mut queue);
@@ -982,19 +982,14 @@ pub fn start_gui(
                     .event_loop
                     .take()
             })
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "tuie: event loop already consumed",
-                )
-            })?;
+            .ok_or_else(|| std::io::Error::other("tuie: event loop already consumed"))?;
         let _ = EVENT_LOOP_PROXY.set(event_loop.create_proxy());
         let mut handler = crate::gui::RunHandler::new(root);
         event_loop
             .run_app(&mut handler)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         let code = try_with_gui_state(|s| s.exit_code).flatten().unwrap_or(0);
-        let _ = with_runtime_mut(|rt| {
+        with_runtime_mut(|rt| {
             let mut handlers = take_quit_handlers();
             for cb in handlers.iter_mut() {
                 cb(&mut rt.buffer);
@@ -1014,7 +1009,7 @@ fn run_terminal(root: &mut dyn Widget) -> std::io::Result<u8> {
                 RuntimeEvent::Quit(c) => Some(*c),
                 _ => None,
             }) {
-                let _ = with_runtime_mut(|rt| {
+                with_runtime_mut(|rt| {
                     let mut handlers = take_quit_handlers();
                     for cb in handlers.iter_mut() {
                         cb(&mut rt.buffer);
@@ -1324,53 +1319,47 @@ impl Runtime {
                 };
                 let mut caps = ImageCaps::default();
 
-                match batch.execute() {
-                    Ok(results) => {
-                        let kitty_reply = results.get(&kitty_h).unwrap_or(None);
-                        caps.supports_kitty_graphics = kitty_reply.is_some();
-                        caps.supports_kitty_shm = kitty_reply == Some(true);
-                        caps.supports_sixel = results.get(&sixel_h).unwrap_or(false);
-                        if let Some(px) = results.get(&cell_px_h).unwrap_or(None) {
-                            info.cell_size = Some(Vec2::new(px.width, px.height));
-                        }
-                        if let (Some(win), Some(cell)) = (
-                            results.get(&win_px_h).unwrap_or(None),
-                            info.cell_size,
-                        ) {
-                            let round_div = |num: u32, den: u32| {
-                                let den = den.max(1);
-                                ((num + den / 2) / den).clamp(1, 4) as u8
-                            };
-                            self.mouse_pixel_dpr = Some(Vec2::new(
-                                round_div(
-                                    cell.x as u32 * initial_size.x as u32,
-                                    win.width as u32,
-                                ),
-                                round_div(
-                                    cell.y as u32 * initial_size.y as u32,
-                                    win.height as u32,
-                                ),
-                            ));
-                        }
-                        info.subcell_events =
-                            results.get(&mouse_px_h).unwrap_or(None).unwrap_or(false)
-                                && self.mouse_pixel_dpr.is_some();
-                        if let Some(ver) = results.get(&xtver).unwrap_or(None) {
-                            if ver.starts_with("WezTerm ") {
-                                caps.supports_kitty_graphics = false;
-                                caps.supports_kitty_shm = false;
-                            }
-                            info.xtversion = Some(ver);
-                        }
-                        #[cfg(feature = "harmonious")]
-                        match crate::theme::harmonious::build_palette_from_batch(color_handles, &results) {
-                            Ok(palette) => {
-                                crate::theme::harmonious::apply_palette(palette);
-                            }
-                            Err(_) => {}
-                        }
+                if let Ok(results) = batch.execute() {
+                    let kitty_reply = results.get(&kitty_h).unwrap_or(None);
+                    caps.supports_kitty_graphics = kitty_reply.is_some();
+                    caps.supports_kitty_shm = kitty_reply == Some(true);
+                    caps.supports_sixel = results.get(&sixel_h).unwrap_or(false);
+                    if let Some(px) = results.get(&cell_px_h).unwrap_or(None) {
+                        info.cell_size = Some(Vec2::new(px.width, px.height));
                     }
-                    Err(_) => {}
+                    if let (Some(win), Some(cell)) = (
+                        results.get(&win_px_h).unwrap_or(None),
+                        info.cell_size,
+                    ) {
+                        let round_div = |num: u32, den: u32| {
+                            let den = den.max(1);
+                            ((num + den / 2) / den).clamp(1, 4) as u8
+                        };
+                        self.mouse_pixel_dpr = Some(Vec2::new(
+                            round_div(
+                                cell.x as u32 * initial_size.x as u32,
+                                win.width as u32,
+                            ),
+                            round_div(
+                                cell.y as u32 * initial_size.y as u32,
+                                win.height as u32,
+                            ),
+                        ));
+                    }
+                    info.subcell_events =
+                        results.get(&mouse_px_h).unwrap_or(None).unwrap_or(false)
+                            && self.mouse_pixel_dpr.is_some();
+                    if let Some(ver) = results.get(&xtver).unwrap_or(None) {
+                        if ver.starts_with("WezTerm ") {
+                            caps.supports_kitty_graphics = false;
+                            caps.supports_kitty_shm = false;
+                        }
+                        info.xtversion = Some(ver);
+                    }
+                    #[cfg(feature = "harmonious")]
+                    if let Ok(palette) = crate::theme::harmonious::build_palette_from_batch(color_handles, &results) {
+                        crate::theme::harmonious::apply_palette(palette);
+                    }
                 }
 
                 #[cfg(all(unix, feature = "images"))]
@@ -1627,7 +1616,7 @@ impl Runtime {
         };
         self.get_valid_prefix_len(root, path) == path.len()
             && self.find_root_for_path(root, path)
-                .find(last).map_or(false, |w| w.is_focusable())
+                .find(last).is_some_and(|w| w.is_focusable())
     }
 
     #[cfg(debug_assertions)]
@@ -1900,12 +1889,11 @@ impl Runtime {
                             let was_dragging = self.dragging;
                             self.dragging = false;
 
-                            if was_dragging {
-                                if !self.mouse_path.is_empty() {
+                            if was_dragging
+                                && !self.mouse_path.is_empty() {
                                     let path = self.mouse_path.clone();
                                     self.dispatch_mouse(root, &path, &mut event);
                                 }
-                            }
 
                             if let Some(select_id) = take_focus_request() {
                                 self.process_focus_request(root, select_id, false);
@@ -1973,10 +1961,7 @@ impl Runtime {
                 update_runtime_info(|info| info.color_scheme = Some(scheme));
                 #[cfg(feature = "harmonious")]
                 {
-                    match crate::theme::harmonious::query_palette() {
-                        Ok(p) => crate::theme::harmonious::apply_palette(p),
-                        Err(_) => {}
-                    }
+                    if let Ok(p) = crate::theme::harmonious::query_palette() { crate::theme::harmonious::apply_palette(p) }
                 }
                 dirty_paint();
             }
@@ -2086,7 +2071,7 @@ impl Runtime {
             if !found_hit {
                 break;
             }
-            if hit_z.map_or(false, |z| z > Layer::Bottom) {
+            if hit_z.is_some_and(|z| z > Layer::Bottom) {
                 break;
             }
 
@@ -2154,7 +2139,7 @@ impl Runtime {
 
         if near_prev {
             if let Some(&scroll_wid) = self.scroll_path.last() {
-                let can_scroll = root.find(scroll_wid).map_or(false, |w| w.can_scroll(direction));
+                let can_scroll = root.find(scroll_wid).is_some_and(|w| w.can_scroll(direction));
                 let alive = self.scroll_held
                     || elapsed < edge_window
                     || (can_scroll && elapsed < alive_window);

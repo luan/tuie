@@ -267,7 +267,7 @@ fn both_scrollbars_single_corner_merges_at_end() {
     term.update(&mut *pane, &[click(Vec2::new(4, 3)), release(Vec2::new(4, 3))]);
     term.update(&mut *pane, &[click(Vec2::new(3, 4)), release(Vec2::new(3, 4))]);
     let snap = term.get_snapshot_text();
-    let last_row = snap.split('\n').last().unwrap();
+    let last_row = snap.split('\n').next_back().unwrap();
     let corner = last_row.chars().last().unwrap();
     assert_eq!(corner, '┘', "expected SINGLE corner glyph at bottom-right, full snap:\n{snap}");
 }
@@ -279,7 +279,7 @@ fn both_scrollbars_thick_corner_merges_at_end() {
     term.update(&mut *pane, &[click(Vec2::new(4, 3)), release(Vec2::new(4, 3))]);
     term.update(&mut *pane, &[click(Vec2::new(3, 4)), release(Vec2::new(3, 4))]);
     let snap = term.get_snapshot_text();
-    let corner = snap.split('\n').last().unwrap().chars().last().unwrap();
+    let corner = snap.split('\n').next_back().unwrap().chars().last().unwrap();
     assert_eq!(corner, '┛', "expected THICK corner glyph at bottom-right, full snap:\n{snap}");
 }
 
@@ -290,7 +290,7 @@ fn both_scrollbars_double_does_not_share_corner() {
     term.update(&mut *pane, &[click(Vec2::new(4, 3)), release(Vec2::new(4, 3))]);
     term.update(&mut *pane, &[click(Vec2::new(3, 4)), release(Vec2::new(3, 4))]);
     let snap = term.get_snapshot_text();
-    let corner = snap.split('\n').last().unwrap().chars().last().unwrap();
+    let corner = snap.split('\n').next_back().unwrap().chars().last().unwrap();
     assert_eq!(corner, ' ', "DOUBLE has no stubs and must not paint a corner glyph, full snap:\n{snap}");
 }
 
@@ -301,7 +301,7 @@ fn both_scrollbars_block_does_not_merge_at_corner() {
     term.update(&mut *pane, &[click(Vec2::new(4, 3)), release(Vec2::new(4, 3))]);
     term.update(&mut *pane, &[click(Vec2::new(3, 4)), release(Vec2::new(3, 4))]);
     let snap = term.get_snapshot_text();
-    let corner = snap.split('\n').last().unwrap().chars().last().unwrap();
+    let corner = snap.split('\n').next_back().unwrap().chars().last().unwrap();
     assert!(
         !matches!(corner, '┘' | '┛' | '╝' | '+'),
         "BLOCK must not paint a border junction at the corner, got {:?}\nfull snap:\n{snap}",

@@ -10,7 +10,7 @@ use super::source::{await_async_entry, prepare_async, SixelQuantized, SourceData
 use super::ImageSource;
 
 thread_local! {
-    static PAYLOAD_SCRATCH: RefCell<Vec<u8>> = RefCell::new(Vec::new());
+    static PAYLOAD_SCRATCH: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
 }
 
 struct SixelLayout {
@@ -175,8 +175,8 @@ pub(crate) fn dispatch(
     });
 
     let image_cell_rows = crop_h.div_ceil(cell_px.y as u32).min(vis_h) as u16;
-    let widget_vis_tl_x = (vis_tl.x - ctx.anchor.x).max(0) as i32;
-    let widget_vis_tl_y = (vis_tl.y - ctx.anchor.y).max(0) as i32;
+    let widget_vis_tl_x = (vis_tl.x - ctx.anchor.x).max(0);
+    let widget_vis_tl_y = (vis_tl.y - ctx.anchor.y).max(0);
     ctx.invalidate(
         Vec2::new(widget_vis_tl_x, widget_vis_tl_y),
         Vec2::new(vis_w as u16, image_cell_rows),

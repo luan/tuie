@@ -24,7 +24,7 @@ impl Stack {
         predicate: &dyn Fn(&dyn Widget) -> bool,
         mut path: Option<&mut Vec<WidgetId>>,
     ) -> Option<WidgetId> {
-        if let Some(found) = child.find_descendant(predicate, path.as_mut().map(|p| &mut **p)) {
+        if let Some(found) = child.find_descendant(predicate, path.as_deref_mut()) {
             if let Some(p) = &mut path {
                 p.push(child.get_id());
             }
@@ -48,7 +48,7 @@ impl Stack {
             return None;
         }
         let hit = child
-            .descendant_at_pos(pos, path.as_mut().map(|p| &mut **p))
+            .descendant_at_pos(pos, path.as_deref_mut())
             .unwrap_or_else(|| child.get_id());
         if let Some(p) = &mut path {
             p.push(child.get_id());
@@ -64,7 +64,7 @@ impl Stack {
         if !Self::contains_pos(layer, pos) {
             return None;
         }
-        let hit = layer.descendant_at_pos(pos, path.as_mut().map(|p| &mut **p))?;
+        let hit = layer.descendant_at_pos(pos, path.as_deref_mut())?;
         if let Some(p) = &mut path {
             p.push(layer.get_id());
         }
@@ -80,7 +80,7 @@ impl Stack {
         if !Self::contains_pos(child, pos) {
             return None;
         }
-        if let Some(found) = child.find_descendant_at_pos(pos, predicate, path.as_mut().map(|p| &mut **p)) {
+        if let Some(found) = child.find_descendant_at_pos(pos, predicate, path.as_deref_mut()) {
             if let Some(p) = &mut path {
                 p.push(child.get_id());
             }
@@ -104,7 +104,7 @@ impl Stack {
         if !Self::contains_pos(layer, pos) {
             return None;
         }
-        let found = layer.find_descendant_at_pos(pos, predicate, path.as_mut().map(|p| &mut **p))?;
+        let found = layer.find_descendant_at_pos(pos, predicate, path.as_deref_mut())?;
         if let Some(p) = &mut path {
             p.push(layer.get_id());
         }
@@ -177,11 +177,11 @@ impl Widget for Stack {
             let size = Self::clamp_layer_size(&**layer, allocated, |l| l.constraints.min_size);
             flow_child(&mut **layer, size);
         }
-        let base_clamped = Self::clamp_base_size(&*self.base, allocated, |l| flow_output_size(l));
+        let base_clamped = Self::clamp_base_size(&*self.base, allocated, flow_output_size);
         let base_margin = self.base.get_layout().get_margin_total();
         self.base.set_rect_size(Axis2D::map(|a| base_clamped[a].saturating_sub(base_margin[a])));
         for layer in self.layers.iter_mut() {
-            let size = Self::clamp_layer_size(&**layer, allocated, |l| flow_output_size(l));
+            let size = Self::clamp_layer_size(&**layer, allocated, flow_output_size);
             let margin = layer.get_layout().get_margin_total();
             layer.set_rect_size(Axis2D::map(|a| size[a].saturating_sub(margin[a])));
         }
@@ -228,7 +228,7 @@ impl Widget for Stack {
         mut path: Option<&mut Vec<WidgetId>>,
     ) -> Option<WidgetId> {
         for layer in self.layers.iter().rev() {
-            if let Some(r) = Self::find_in_child(&**layer, predicate, path.as_mut().map(|p| &mut **p)) {
+            if let Some(r) = Self::find_in_child(&**layer, predicate, path.as_deref_mut()) {
                 return Some(r);
             }
         }
@@ -283,7 +283,7 @@ impl Widget for Stack {
         mut path: Option<&mut Vec<WidgetId>>,
     ) -> Option<WidgetId> {
         for layer in self.layers.iter().rev() {
-            if let Some(r) = Self::hit_layer(&**layer, pos, path.as_mut().map(|p| &mut **p)) {
+            if let Some(r) = Self::hit_layer(&**layer, pos, path.as_deref_mut()) {
                 return Some(r);
             }
         }
@@ -297,7 +297,7 @@ impl Widget for Stack {
         mut path: Option<&mut Vec<WidgetId>>,
     ) -> Option<WidgetId> {
         for layer in self.layers.iter().rev() {
-            if let Some(r) = Self::find_hit_layer(&**layer, pos, predicate, path.as_mut().map(|p| &mut **p)) {
+            if let Some(r) = Self::find_hit_layer(&**layer, pos, predicate, path.as_deref_mut()) {
                 return Some(r);
             }
         }

@@ -22,7 +22,7 @@ impl Revelation {
     /// Translates every entry by `by`.
     pub fn translate(&mut self, by: Vec2<i32>) {
         for r in &mut self.rects {
-            r.pos = r.pos + by;
+            r.pos += by;
         }
     }
 

@@ -122,7 +122,7 @@ fn extend_to_256(fg: Rgb, bg: Rgb, colors: &mut [Rgb; 256]) {
 }
 
 thread_local! {
-    static COLOR_TABLE: RefCell<Option<Palette>> = RefCell::new(None);
+    static COLOR_TABLE: RefCell<Option<Palette>> = const { RefCell::new(None) };
 }
 
 fn color_query_types() -> Vec<ColorType> {
@@ -242,7 +242,7 @@ pub fn resolve_color(color: Color) -> Color {
 
 fn invert_index(n: u8) -> u8 {
     if n < 16 {
-        return n;
+        n
     } else if n < 232 {
         let idx = (n - 16) as i16;
         let r = idx / 36;

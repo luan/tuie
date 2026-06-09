@@ -22,8 +22,10 @@ use std::sync::Arc;
 /// How the window's title bar is presented.
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
+#[derive(Default)]
 pub enum TitleBar {
     /// Transparent title bar with a top pad reserved above the grid.
+    #[default]
     Padding,
     /// Transparent title bar with no top pad.
     Overlap,
@@ -31,11 +33,6 @@ pub enum TitleBar {
     System,
 }
 
-impl Default for TitleBar {
-    fn default() -> Self {
-        TitleBar::Padding
-    }
-}
 
 impl std::fmt::Display for TitleBar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -153,7 +150,7 @@ pub mod config {
 
 #[cfg(feature = "harmonious")]
 fn apply_window_theme(win_theme: Option<winit::window::Theme>, cfg: &GuiConfig) {
-    let scheme = cfg.color_scheme.unwrap_or_else(|| match win_theme {
+    let scheme = cfg.color_scheme.unwrap_or(match win_theme {
         Some(winit::window::Theme::Light) => ColorScheme::Light,
         _ => ColorScheme::Dark,
     });
@@ -173,7 +170,7 @@ pub fn title_bar_insets() -> (u16, u16) {
     #[cfg(target_os = "macos")]
     {
         crate::runtime::try_with_gui_state(|s| {
-            let cell_w = (s.font.get_cell_w() as u32).max(1);
+            let cell_w = s.font.get_cell_w().max(1);
             let traffic_light_px = 66u32 * s.scale.max(1);
             let cells = traffic_light_px.div_ceil(cell_w).min(u16::MAX as u32) as u16;
             (cells, 0u16)
@@ -309,12 +306,7 @@ impl GuiState {
     }
 
     fn first_held_button(&self) -> Option<MouseButton> {
-        for btn in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
-            if self.held_buttons & Self::button_mask(btn) != 0 {
-                return Some(btn);
-            }
-        }
-        None
+        [MouseButton::Left, MouseButton::Right, MouseButton::Middle].into_iter().find(|&btn| self.held_buttons & Self::button_mask(btn) != 0)
     }
 
     fn push_scroll(&mut self, axis: Axis2D, delta_cells: f32) {
@@ -362,7 +354,7 @@ impl Gui {
         let gpu_worker = std::thread::spawn(gpu::build_instance_and_adapter);
 
         let event_loop = EventLoop::new()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         let db = fontdb_worker.join().expect("fontdb worker panicked");
         let (instance, adapter) = gpu_worker.join().expect("gpu worker panicked")?;
         let font = FontCache::new_with_db(&cfg, db, 1)?;
@@ -779,7 +771,7 @@ impl GuiState {
                 self.cursor_blink_anchor
                     + std::time::Duration::from_millis((phase + 1) * Self::BLINK_HALF_MS),
             );
-            if phase % 2 == 0 {
+            if phase.is_multiple_of(2) {
                 cursor_xy
             } else {
                 None
@@ -1087,10 +1079,10 @@ fn drain_offset_entries(
                 cursor_painted = true;
             }
         }
-        let phys_size: Vec2<u16>;
+        
         let screen_pos_px: Vec2<i32>;
         let scissor: Option<(Vec2<i32>, Vec2<u32>)>;
-        let bg_alpha: f32;
+        
         let mut local_cursor_xy: Option<(u16, u16)> = None;
         match &entry.kind {
             crate::render::Kind::Offset {
@@ -1125,7 +1117,7 @@ fn drain_offset_entries(
                 // deref below). `entry.widget` is live for the duration of
                 // this present pass.
                 let entry_id = unsafe { &*entry.widget }.get_id();
-                let in_sel = focus_chain.iter().any(|id| *id == entry_id);
+                let in_sel = focus_chain.contains(&entry_id);
                 if in_sel {
                     let content_min = entry.snapshot.anchor;
                     let content_max_x = content_min.x + entry.snapshot.physical_size.x as i32;
@@ -1177,8 +1169,8 @@ fn drain_offset_entries(
         // cleared per paint and fully drained inside this present pass, and
         // nothing mutates the widget tree between push and drain.
         let widget: &dyn Widget = unsafe { &*entry.widget };
-        bg_alpha = widget.get_style().get_blend().unwrap_or(100) as f32 / 100.0;
-        phys_size = entry.snapshot.physical_size;
+        let bg_alpha: f32 = widget.get_style().get_blend().unwrap_or(100) as f32 / 100.0;
+        let phys_size: Vec2<u16> = entry.snapshot.physical_size;
         let (is_layer, mut pass_scissor) = match entry.kind {
             crate::render::Kind::Layer => (true, scissor),
             crate::render::Kind::Popup => (false, None),

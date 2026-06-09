@@ -332,16 +332,16 @@ fn cover_placement(
     let widget_wider = w_px_x * src_px.y as u64 > w_px_y * src_px.x as u64;
     let (vp, off) = if widget_wider {
         let image_h = (src_px.y as u64 * w_px_x + src_px.x as u64 / 2) / src_px.x as u64;
-        let mut r = ((image_h + cell_px.y as u64 - 1) / cell_px.y as u64).max(widget.y as u64);
-        if (r - widget.y as u64) % 2 != 0 {
+        let mut r = image_h.div_ceil(cell_px.y as u64).max(widget.y as u64);
+        if !(r - widget.y as u64).is_multiple_of(2) {
             r += 1;
         }
         let row_off = (r - widget.y as u64) / 2;
         (Vec2::new(widget.x as u64, r), Vec2::new(0u64, row_off))
     } else {
         let image_w = (src_px.x as u64 * w_px_y + src_px.y as u64 / 2) / src_px.y as u64;
-        let mut c = ((image_w + cell_px.x as u64 - 1) / cell_px.x as u64).max(widget.x as u64);
-        if (c - widget.x as u64) % 2 != 0 {
+        let mut c = image_w.div_ceil(cell_px.x as u64).max(widget.x as u64);
+        if !(c - widget.x as u64).is_multiple_of(2) {
             c += 1;
         }
         let col_off = (c - widget.x as u64) / 2;

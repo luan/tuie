@@ -1327,7 +1327,7 @@ impl Widget for Grid {
     ) -> Option<WidgetId> {
         for cell in self.cells.iter() {
             let grandchild = cell.widget
-                .find_descendant(predicate, path.as_mut().map(|p| &mut **p));
+                .find_descendant(predicate, path.as_deref_mut());
             if grandchild.is_some() {
                 if let Some(p) = &mut path {
                     p.push(cell.widget.get_id());
@@ -1354,7 +1354,7 @@ impl Widget for Grid {
                 continue;
             }
             let descendant = cell.widget
-                .descendant_at_pos(pos, path.as_mut().map(|p| &mut **p));
+                .descendant_at_pos(pos, path.as_deref_mut());
             if let Some(p) = &mut path {
                 p.push(cell.widget.get_id());
             }
@@ -1374,7 +1374,7 @@ impl Widget for Grid {
                 continue;
             }
             let grandchild = cell.widget
-                .find_descendant_at_pos(pos, predicate, path.as_mut().map(|p| &mut **p));
+                .find_descendant_at_pos(pos, predicate, path.as_deref_mut());
             if grandchild.is_some() {
                 if let Some(p) = &mut path {
                     p.push(cell.widget.get_id());

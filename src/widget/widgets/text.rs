@@ -265,7 +265,7 @@ impl Widget for Text {
                 let chunk_end = run_end.min(line_end);
                 ctx.set_style(style);
                 let mut tab_iter = TabIterator::new(col, tabstop, &text[pos..chunk_end]);
-                while let Some(part) = tab_iter.next() {
+                for part in tab_iter.by_ref() {
                     for _ in 0..part.leftpad {
                         ctx.write(" ");
                     }
@@ -443,10 +443,7 @@ impl Text {
                     return Vec2::new(w, line.y);
                 }
                 if wrap_bias == Sign::Negative
-                    || content.as_str()[line.offset + line.content.len()..]
-                        .chars()
-                        .next()
-                        == Some('\n')
+                    || content.as_str()[line.offset + line.content.len()..].starts_with('\n')
                 {
                     return Vec2::new(w, line.y);
                 }
@@ -478,7 +475,7 @@ impl Text {
             self.align,
             self.tabstop(),
         ) {
-            if line.y as usize == pos.y {
+            if line.y == pos.y {
                 let mut remaining = pos.x as i32 - line.pad_left as i32;
                 for part in TabIterator::new(
                     0,

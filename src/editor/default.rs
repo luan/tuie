@@ -115,7 +115,7 @@ impl<T: TextDocument + 'static> InputBindings<T> for DefaultBindings<T> {
             chord!(Ctrl + u) => state.delete_to_line_edge(text, Sign::Negative),
 
             _ => {
-                if !on_input_shared(state, text, &event) {
+                if !on_input_shared(state, text, event) {
                     return InputResult::Rejected;
                 }
             }

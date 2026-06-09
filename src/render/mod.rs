@@ -827,8 +827,8 @@ impl GridRendererState {
                 if x as i32 + dirty_cols >= self.size.x as i32 {
                     current_line = u16::MAX;
                 }
-                dirty_cols -= width as i32;
-                cols_until_last_cell -= width as i32;
+                dirty_cols -= width;
+                cols_until_last_cell -= width;
                 x += width as u16;
                 i += width as usize;
             }
@@ -1463,7 +1463,6 @@ impl<'a> RenderContext<'a> {
             }
             col += w;
         }
-        drop(row);
         self.cursor.x += advance;
     }
 

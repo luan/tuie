@@ -103,7 +103,7 @@ pub(crate) fn build_instance_and_adapter() -> std::io::Result<(wgpu::Instance, w
 }
 
 fn io_err<E: std::fmt::Display>(e: E) -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+    std::io::Error::other(e.to_string())
 }
 
 #[cfg(target_os = "macos")]

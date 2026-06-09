@@ -39,7 +39,7 @@ impl<T: TextDocument + 'static> InputBindings<T> for ModernBindings<T> {
             chord!(Ctrl + a) => state.select_all(text),
             chord!(Ctrl + c) => state.copy(text),
             _ => {
-                if !on_input_shared(state, text, &event) {
+                if !on_input_shared(state, text, event) {
                     return InputResult::Rejected;
                 }
             }
