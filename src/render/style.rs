@@ -1106,6 +1106,12 @@ pub struct AnsiStyleParser {
     style: Style,
 }
 
+impl Default for AnsiStyleParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnsiStyleParser {
     /// Creates a parser starting with default style state.
     pub const fn new() -> Self {

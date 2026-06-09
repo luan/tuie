@@ -856,6 +856,12 @@ pub struct GridRenderer {
     state: GridRendererState,
 }
 
+impl Default for GridRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GridRenderer {
     /// Creates a renderer with an empty grid.
     pub fn new() -> Self {

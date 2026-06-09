@@ -190,6 +190,12 @@ impl ScrollbarState {
     }
 }
 
+impl Default for ScrollbarState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScrollbarState {
     /// Creates a hidden, unscrolled state with no active drag.
     pub const fn new() -> Self {
@@ -489,6 +495,12 @@ pub struct ScrollbarStyle {
     pub track: Option<char>,
     /// Style layered over the global config track style. Empty fields inherit.
     pub track_style: Style,
+}
+
+impl Default for ScrollbarStyle {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ScrollbarStyle {

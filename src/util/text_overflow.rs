@@ -510,6 +510,12 @@ pub struct TextOverflow {
     word_break: &'static str,
 }
 
+impl Default for TextOverflow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TextOverflow {
     /// Single-line truncation with a trailing ellipsis at a word boundary.
     pub const ELLIPSIS: &'static TextOverflow =

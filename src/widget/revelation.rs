@@ -8,6 +8,12 @@ pub struct Revelation {
     rects: Vec<Rect<i32, u16>>,
 }
 
+impl Default for Revelation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Revelation {
     /// Creates an empty revelation.
     pub const fn new() -> Self {

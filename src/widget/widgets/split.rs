@@ -2132,6 +2132,12 @@ impl SplitPane {
     }
 }
 
+impl Default for SplitPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SplitPane {
     /// Creates an empty pane stacking children along the Y axis.
     pub fn new() -> Self {

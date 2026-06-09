@@ -64,6 +64,12 @@ impl std::fmt::Display for Modifiers {
     }
 }
 
+impl Default for Modifiers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Modifiers {
     /// Creates an empty modifier set.
     pub const fn new() -> Self {

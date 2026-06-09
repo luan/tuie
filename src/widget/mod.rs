@@ -552,6 +552,12 @@ impl FlowMeasureCache {
     }
 }
 
+impl Default for Layout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Layout {
     /// Creates a [`Layout`] with a fresh widget id.
     pub fn new() -> Self {
