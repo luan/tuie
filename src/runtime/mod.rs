@@ -272,11 +272,20 @@ struct RuntimeContext {
     runtime_info: Option<RuntimeInfo>,
     image_caps: ImageCaps,
     pending_cell_px: Option<Vec2<u16>>,
+    buffer: std::io::BufWriter<Box<dyn Write>>,
+    panic_hook: Arc<Mutex<Option<PanicHook>>>,
+    renderer: GridRenderer,
+    terminal_initialized: bool,
+    cursor_visible: bool,
+    buf: String,
+    mouse_pixel_dpr: Option<Vec2<u8>>,
 }
 
 impl RuntimeContext {
     fn new() -> Self {
         let (spawn_tx, spawn_rx) = sync_mpsc::channel();
+        let buffer: std::io::BufWriter<Box<dyn Write>> =
+            std::io::BufWriter::with_capacity(65536, Box::new(std::io::stdout()));
         RuntimeContext {
             mode: Mode::Tui,
             reveal_request: None,
@@ -294,6 +303,13 @@ impl RuntimeContext {
             runtime_info: None,
             image_caps: ImageCaps::default(),
             pending_cell_px: None,
+            buffer,
+            panic_hook: Arc::new(Mutex::new(None)),
+            renderer: GridRenderer::new(),
+            terminal_initialized: false,
+            cursor_visible: true,
+            buf: String::new(),
+            mouse_pixel_dpr: None,
         }
     }
 }
@@ -685,6 +701,28 @@ fn with_ctx_mut<R>(f: impl FnOnce(&mut RuntimeContext) -> R) -> R {
     RUNTIME_CTX.with_borrow_mut(f)
 }
 
+fn with_render_io<R>(
+    f: impl FnOnce(&mut GridRenderer, &mut std::io::BufWriter<Box<dyn Write>>, &mut String) -> R,
+) -> R {
+    let (mut renderer, mut buffer, mut buf) = with_ctx_mut(|ctx| {
+        (
+            std::mem::take(&mut ctx.renderer),
+            std::mem::replace(
+                &mut ctx.buffer,
+                std::io::BufWriter::with_capacity(0, Box::new(std::io::sink())),
+            ),
+            std::mem::take(&mut ctx.buf),
+        )
+    });
+    let out = f(&mut renderer, &mut buffer, &mut buf);
+    with_ctx_mut(|ctx| {
+        ctx.renderer = renderer;
+        ctx.buffer = buffer;
+        ctx.buf = buf;
+    });
+    out
+}
+
 /// Registers a callback invoked just before the runtime tears down.
 pub fn on_quit(cb: impl FnMut(&mut dyn Write) + 'static) -> TaskHandle {
     with_ctx_mut(|ctx| {
@@ -824,19 +862,19 @@ fn process_keys_interleaved(root: &mut dyn Widget) {
 
 /// Replaces the writer used to flush rendered frames.
 pub fn set_output(output: impl Write + 'static) {
-    with_runtime_mut(|rt| {
-        rt.buffer = std::io::BufWriter::with_capacity(65536, Box::new(output));
+    with_ctx_mut(|ctx| {
+        ctx.buffer = std::io::BufWriter::with_capacity(65536, Box::new(output));
     });
 }
 
 /// Enters the alternate screen and enables raw mode.
 pub fn enable() -> std::io::Result<()> {
-    with_runtime_mut(|rt| rt.enable())
+    with_ctx_mut(|ctx| ctx.enable())
 }
 
 /// Restores the terminal state changed by [`enable`].
 pub fn disable() -> std::io::Result<()> {
-    with_runtime_mut(|rt| rt.disable())
+    with_ctx_mut(|ctx| ctx.disable())
 }
 
 /// Requests a suspend: the next runtime tick disables the terminal, raises `SIGSTOP`, and
@@ -850,15 +888,15 @@ pub(crate) fn update(
     root: &mut dyn Widget,
     events: &[RuntimeEvent],
 ) -> std::io::Result<Option<std::time::Duration>> {
-    let inactive = with_runtime_mut(|rt| rt.panic_hook.lock().unwrap().is_none());
+    let inactive = with_ctx(|ctx| ctx.panic_hook.lock().unwrap().is_none());
     if inactive {
-        with_runtime_mut(|rt| rt.enable())?;
+        with_ctx_mut(|ctx| ctx.enable())?;
     }
 
     for event in events {
         match event {
             RuntimeEvent::Suspend => {
-                with_runtime_mut(|rt| rt.suspend())?;
+                with_ctx_mut(|ctx| ctx.suspend())?;
                 dirty_layout();
             }
             RuntimeEvent::Resize(size) => {
@@ -969,12 +1007,12 @@ pub fn start_gui(
     root: Box<dyn Widget>,
 ) -> std::io::Result<std::process::ExitCode> {
     with_ctx_mut(|c| c.mode = Mode::Gui);
-    with_runtime_mut(|rt| {
-        rt.buffer =
+    with_ctx_mut(|ctx| {
+        ctx.buffer =
             std::io::BufWriter::with_capacity(4096, Box::new(std::io::sink()));
     });
     let result = (|| -> std::io::Result<u8> {
-        with_runtime_mut(|rt| rt.enable())?;
+        with_ctx_mut(|ctx| ctx.enable())?;
         let event_loop = GUI
             .with_borrow_mut(|g| {
                 g.as_mut()
@@ -989,15 +1027,15 @@ pub fn start_gui(
             .run_app(&mut handler)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         let code = try_with_gui_state(|s| s.exit_code).flatten().unwrap_or(0);
-        with_runtime_mut(|rt| {
-            let mut handlers = take_quit_handlers();
+        let mut handlers = take_quit_handlers();
+        with_ctx_mut(|ctx| {
             for cb in handlers.iter_mut() {
-                cb(&mut rt.buffer);
+                cb(&mut ctx.buffer);
             }
         });
         Ok(code)
     })();
-    let _ = with_runtime_mut(|rt| rt.disable());
+    let _ = with_ctx_mut(|ctx| ctx.disable());
     result.map(std::process::ExitCode::from)
 }
 
@@ -1009,10 +1047,10 @@ fn run_terminal(root: &mut dyn Widget) -> std::io::Result<u8> {
                 RuntimeEvent::Quit(c) => Some(*c),
                 _ => None,
             }) {
-                with_runtime_mut(|rt| {
-                    let mut handlers = take_quit_handlers();
+                let mut handlers = take_quit_handlers();
+                with_ctx_mut(|ctx| {
                     for cb in handlers.iter_mut() {
-                        cb(&mut rt.buffer);
+                        cb(&mut ctx.buffer);
                     }
                 });
                 return Ok(code);
@@ -1021,7 +1059,7 @@ fn run_terminal(root: &mut dyn Widget) -> std::io::Result<u8> {
             events = read(timeout)?;
         }
     })();
-    let _ = with_runtime_mut(|rt| rt.disable());
+    let _ = with_ctx_mut(|ctx| ctx.disable());
     result
 }
 
@@ -1029,8 +1067,8 @@ fn run_terminal(root: &mut dyn Widget) -> std::io::Result<u8> {
 pub(crate) fn init_emulator(size: Vec2<u16>) {
     RUNTIME.with_borrow_mut(|rt| *rt = Runtime::new());
     with_ctx_mut(|ctx| *ctx = RuntimeContext::new());
-    with_runtime_mut(|rt| {
-        *rt.panic_hook.lock().unwrap() = Some(Box::new(|_| {}));
+    with_ctx_mut(|ctx| {
+        *ctx.panic_hook.lock().unwrap() = Some(Box::new(|_| {}));
     });
     set_output(std::io::sink());
     with_ctx_mut(|ctx| {
@@ -1041,7 +1079,7 @@ pub(crate) fn init_emulator(size: Vec2<u16>) {
 
 /// Returns the most recently rendered frame as a [`crate::render::style::StyledString`] snapshot.
 pub(crate) fn get_emulator_snapshot() -> crate::render::style::StyledString {
-    with_runtime_mut(|rt| rt.renderer.get_snapshot())
+    with_ctx(|ctx| ctx.renderer.get_snapshot())
 }
 
 fn read(timeout: Option<Duration>) -> std::io::Result<Vec<RuntimeEvent>> {
@@ -1076,17 +1114,11 @@ pub(crate) fn take_pending_gui_events() -> Vec<RuntimeEvent> {
 }
 
 struct Runtime {
-    buffer: std::io::BufWriter<Box<dyn Write>>,
-    panic_hook: Arc<Mutex<Option<PanicHook>>>,
-    renderer: GridRenderer,
-    terminal_initialized: bool,
     last_scroll: std::time::Instant,
     scroll_held: bool,
     scroll_accum: Vec2<f32>,
     scroll_pos: Vec2<f32>,
     mouse_pos: Vec2<f32>,
-    cursor_visible: bool,
-    buf: String,
     dragging: bool,
     scroll_path: Vec<WidgetId>,
     mouse_path: Vec<WidgetId>,
@@ -1098,7 +1130,6 @@ struct Runtime {
     has_rendered: bool,
     pending_events: Vec<RuntimeEvent>,
     popups: Vec<crate::runtime::popup::ActivePopup>,
-    mouse_pixel_dpr: Option<Vec2<u8>>,
 }
 
 fn find_visible_focusable(
@@ -1157,15 +1188,7 @@ impl Runtime {
     }
 
     fn new() -> Self {
-        let buffer: std::io::BufWriter<Box<dyn Write>> =
-            std::io::BufWriter::with_capacity(65536, Box::new(std::io::stdout()));
         Self {
-            buffer,
-            panic_hook: Arc::new(Mutex::new(None)),
-            cursor_visible: true,
-            buf: String::new(),
-            renderer: GridRenderer::new(),
-            terminal_initialized: false,
             scroll_path: Vec::new(),
             dragging: false,
             mouse_path: Vec::new(),
@@ -1183,12 +1206,13 @@ impl Runtime {
             has_rendered: false,
             pending_events: Vec::new(),
             popups: Vec::new(),
-            mouse_pixel_dpr: None,
         }
     }
+}
 
+impl RuntimeContext {
     fn enable(&mut self) -> std::io::Result<()> {
-        match with_ctx(|c| c.mode) {
+        match self.mode {
             Mode::Tui => self.enable_terminal(),
             #[cfg(feature = "gui")]
             Mode::Gui => self.enable_gui(),
@@ -1279,19 +1303,17 @@ impl Runtime {
             );
         }
         let (cell_size, cell_px) = with_gui_state(|s| (s.cell_size, s.font_cell_px()));
-        with_ctx_mut(|ctx| {
-            ctx.pending_cell_px = Some(cell_px);
-            ctx.runtime_info = Some(RuntimeInfo {
-                size: cell_size,
-                cell_size: Some(cell_px),
-                subcell_events: true,
-                ..Default::default()
-            });
-            ctx.image_caps = ImageCaps::default();
+        self.pending_cell_px = Some(cell_px);
+        self.runtime_info = Some(RuntimeInfo {
+            size: cell_size,
+            cell_size: Some(cell_px),
+            subcell_events: true,
+            ..Default::default()
         });
+        self.image_caps = ImageCaps::default();
         self.renderer.clear();
         self.cursor_visible = true;
-        dirty_layout();
+        self.dirty |= DirtyImpact::Layout;
         Ok(())
     }
 
@@ -1365,11 +1387,9 @@ impl Runtime {
                 #[cfg(all(unix, feature = "images"))]
                 crate::render::image::shm::unlink_probe();
 
-                with_ctx_mut(|ctx| {
-                    ctx.pending_cell_px = info.cell_size;
-                    ctx.runtime_info = Some(info);
-                    ctx.image_caps = caps;
-                });
+                self.pending_cell_px = info.cell_size;
+                self.runtime_info = Some(info);
+                self.image_caps = caps;
             }
 
             let wake_fd = init_waker()?;
@@ -1377,12 +1397,8 @@ impl Runtime {
             reader.set_wake_fd(wake_fd);
             EVENT_READER.with_borrow_mut(|r| *r = Some(reader));
             let _ = signals::install(waker_write());
-        } else {
-            with_ctx_mut(|ctx| {
-                if let Some(info) = ctx.runtime_info.as_mut() {
-                    info.size = initial_size;
-                }
-            });
+        } else if let Some(info) = self.runtime_info.as_mut() {
+            info.size = initial_size;
         }
 
         self.buf.clear();
@@ -1394,12 +1410,11 @@ impl Runtime {
             output::enable_mouse_hover_events(&mut self.buf);
         }
         output::enable_sgr_mouse(&mut self.buf);
-        let pixel_mouse = with_ctx(|ctx| {
-            ctx.runtime_info
-                .as_ref()
-                .map(|i| i.subcell_events)
-                .unwrap_or(false)
-        });
+        let pixel_mouse = self
+            .runtime_info
+            .as_ref()
+            .map(|i| i.subcell_events)
+            .unwrap_or(false);
         if pixel_mouse {
             output::enable_mouse_pixel_capture(&mut self.buf);
             set_mouse_pixel_dpr(self.mouse_pixel_dpr);
@@ -1417,7 +1432,7 @@ impl Runtime {
 
         self.cursor_visible = true;
 
-        dirty_layout();
+        self.dirty |= DirtyImpact::Layout;
 
         self.buffer.write_all(self.buf.as_bytes())?;
         self.buffer.flush()?;
@@ -1425,7 +1440,7 @@ impl Runtime {
     }
 
     fn disable(&mut self) -> std::io::Result<()> {
-        match with_ctx(|c| c.mode) {
+        match self.mode {
             Mode::Tui => self.disable_terminal(),
             #[cfg(feature = "gui")]
             Mode::Gui => {
@@ -1453,8 +1468,10 @@ impl Runtime {
         self.cursor_visible = true;
         output::leave_alternate_screen(&mut self.buf);
         output::pop_keyboard_enhancement_flags(&mut self.buf);
-        let pixel_mouse = RUNTIME_CTX
-            .try_with(|ctx| ctx.borrow().runtime_info.as_ref().map(|i| i.subcell_events).unwrap_or(false))
+        let pixel_mouse = self
+            .runtime_info
+            .as_ref()
+            .map(|i| i.subcell_events)
             .unwrap_or(false);
         if pixel_mouse {
             output::disable_mouse_pixel_capture(&mut self.buf);
@@ -1481,7 +1498,9 @@ impl Runtime {
         }
         Ok(())
     }
+}
 
+impl Runtime {
     fn focused_widget_id(&self) -> Option<WidgetId> {
         self.focus_chain.last().copied()
     }
@@ -2385,7 +2404,7 @@ impl Runtime {
             clear_path_cache();
         }
 
-        self.renderer.resize(terminal_size);
+        with_ctx_mut(|ctx| ctx.renderer.resize(terminal_size));
 
         self.flush_events(root);
 
@@ -2447,10 +2466,10 @@ impl Runtime {
             Some(_) => path_subcell_offset(root, &self.focus_chain),
             None => Vec2::of(0i32),
         };
-        let renderer = &mut self.renderer;
-        let buffer = &mut self.buffer;
         let focus_chain = &self.focus_chain;
-        try_with_gui_state(|s| s.present(renderer, cursor, cursor_subpixel, focus_chain, buffer));
+        with_render_io(|renderer, buffer, _buf| {
+            try_with_gui_state(|s| s.present(renderer, cursor, cursor_subpixel, focus_chain, buffer));
+        });
     }
 
     fn layout(&mut self, root: &mut dyn Widget, viewport_size: Vec2<u16>) {
@@ -2520,33 +2539,36 @@ impl Runtime {
         root: &dyn Widget,
         _cursor: Option<(CursorShape, Vec2<i32>)>,
     ) -> std::io::Result<()> {
-        let _ = self.renderer.take_full_dirty();
         let (grid_origin_px, window_px) = try_with_gui_state(|s| {
             let o = s.grid_origin();
             (Vec2::new(o.x as i32, o.y as i32), s.pixel_size)
         })
         .unwrap_or((Vec2::of(0i32), Vec2::of(0u32)));
-        self.renderer.set_root_screen_pos_px(grid_origin_px);
-        if let Some(cell_px) = get_runtime_info().cell_size {
-            let size = self.renderer.gui_size();
-            let grid_size_px = Vec2::new(
-                size.x as u32 * cell_px.x as u32,
-                size.y as u32 * cell_px.y as u32,
-            );
-            let root_clip_size = Vec2::new(
-                grid_size_px
-                    .x
-                    .max(window_px.x.saturating_sub(grid_origin_px.x.max(0) as u32)),
-                grid_size_px
-                    .y
-                    .max(window_px.y.saturating_sub(grid_origin_px.y.max(0) as u32)),
-            );
-            self.renderer
-                .set_root_clip_screen_px((grid_origin_px, root_clip_size));
-        }
-        self.renderer.clear_defer_queue();
-        self.renderer.render_to_queue(root, Vec2::of(0i32), &mut self.buffer);
-        seed_popup_queue(&mut self.renderer, &mut self.buffer, &self.popups);
+        let cell_size = get_runtime_info().cell_size;
+        let popups = &self.popups;
+        with_render_io(|renderer, buffer, _buf| {
+            let _ = renderer.take_full_dirty();
+            renderer.set_root_screen_pos_px(grid_origin_px);
+            if let Some(cell_px) = cell_size {
+                let size = renderer.gui_size();
+                let grid_size_px = Vec2::new(
+                    size.x as u32 * cell_px.x as u32,
+                    size.y as u32 * cell_px.y as u32,
+                );
+                let root_clip_size = Vec2::new(
+                    grid_size_px
+                        .x
+                        .max(window_px.x.saturating_sub(grid_origin_px.x.max(0) as u32)),
+                    grid_size_px
+                        .y
+                        .max(window_px.y.saturating_sub(grid_origin_px.y.max(0) as u32)),
+                );
+                renderer.set_root_clip_screen_px((grid_origin_px, root_clip_size));
+            }
+            renderer.clear_defer_queue();
+            renderer.render_to_queue(root, Vec2::of(0i32), buffer);
+            seed_popup_queue(renderer, buffer, popups);
+        });
         Ok(())
     }
 
@@ -2555,49 +2577,54 @@ impl Runtime {
         root: &dyn Widget,
         cursor: Option<(CursorShape, Vec2<i32>)>,
     ) -> std::io::Result<()> {
-        self.buf.clear();
-        output::begin_synchronized_update(&mut self.buf);
-        if self.renderer.take_full_dirty() {
-            output::clear_screen(&mut self.buf);
-        }
-        self.buffer.write_all(self.buf.as_bytes())?;
-        self.renderer.clear_defer_queue();
-        self.renderer.render_to_queue(root, Vec2::of(0i32), &mut self.buffer);
-        seed_popup_queue(&mut self.renderer, &mut self.buffer, &self.popups);
-        self.renderer.drain_queue(&mut self.buffer);
-        self.renderer.flush(&mut self.buffer)?;
-
-        self.buf.clear();
-        output::end_synchronized_update(&mut self.buf);
-
-        let mut cursor_visible = false;
         let term_size = get_runtime_info().size;
-        let in_grid = |pos: Vec2<i32>| {
-            pos.x >= 0
-                && pos.y >= 0
-                && pos.x < term_size.x as i32
-                && pos.y < term_size.y as i32
-        };
-        if let Some((shape, pos)) = cursor.filter(|(_, p)| in_grid(*p)) {
-            output::move_to(&mut self.buf, pos.x as u16, pos.y as u16);
-            cursor_visible = true;
-            if !self.cursor_visible {
-                self.cursor_visible = true;
-                output::show_cursor(&mut self.buf);
+        let popups = &self.popups;
+        with_render_io(|renderer, buffer, buf| {
+            buf.clear();
+            output::begin_synchronized_update(buf);
+            if renderer.take_full_dirty() {
+                output::clear_screen(buf);
             }
-            output::set_cursor_style(&mut self.buf, shape, config::get().cursor_blink);
-        }
+            buffer.write_all(buf.as_bytes())?;
+            renderer.clear_defer_queue();
+            renderer.render_to_queue(root, Vec2::of(0i32), buffer);
+            seed_popup_queue(renderer, buffer, popups);
+            renderer.drain_queue(buffer);
+            renderer.flush(buffer)?;
 
-        if !cursor_visible {
-            output::move_to(&mut self.buf, 0, 0);
-            if self.cursor_visible {
-                self.cursor_visible = false;
-                output::hide_cursor(&mut self.buf);
+            buf.clear();
+            output::end_synchronized_update(buf);
+
+            let mut was_visible = with_ctx(|ctx| ctx.cursor_visible);
+            let mut cursor_visible = false;
+            let in_grid = |pos: Vec2<i32>| {
+                pos.x >= 0
+                    && pos.y >= 0
+                    && pos.x < term_size.x as i32
+                    && pos.y < term_size.y as i32
+            };
+            if let Some((shape, pos)) = cursor.filter(|(_, p)| in_grid(*p)) {
+                output::move_to(buf, pos.x as u16, pos.y as u16);
+                cursor_visible = true;
+                if !was_visible {
+                    was_visible = true;
+                    output::show_cursor(buf);
+                }
+                output::set_cursor_style(buf, shape, config::get().cursor_blink);
             }
-        }
-        self.buffer.write_all(self.buf.as_bytes())?;
-        self.buffer.flush()?;
-        Ok(())
+
+            if !cursor_visible {
+                output::move_to(buf, 0, 0);
+                if was_visible {
+                    was_visible = false;
+                    output::hide_cursor(buf);
+                }
+            }
+            with_ctx_mut(|ctx| ctx.cursor_visible = was_visible);
+            buffer.write_all(buf.as_bytes())?;
+            buffer.flush()?;
+            Ok(())
+        })
     }
 
     fn drain_popup_queues(&mut self, root: &mut dyn Widget) {
